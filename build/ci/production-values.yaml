@@ -143,6 +143,24 @@ monitor:
 cronJobs:
   regenerate:
     enabled: false
+  dailyEmailNotifications:
+    enabled: true
+  indexFromQueue:
+    enabled: true
+  metrics:
+    enabled: true
+  nationBuilderSync:
+    enabled: false
+  rambiWebpagesWeekly:
+    enabled: false
+  reindexElasticSearch:
+    enabled: true
+  topicsIndexing:
+    enabled: true
+  trello:
+    enabled: false
+  weeklyEmailNotifications:
+    enabled: true
 secrets:
   localSettings:
     ref: local-settings-secrets-production
@@ -171,4 +189,3 @@ localSettings:
   DEFAULT_FROM_EMAIL: "Contextus <hello@contextus.org>"
   SERVER_EMAIL: "dev@contextus.org"
   MULTISERVER_ENABLED: "False"
-
