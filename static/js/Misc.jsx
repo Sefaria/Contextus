@@ -150,25 +150,20 @@ const DonateLink = ({children, classes, source, link}) => {
     link = link || "default";
     const linkOptions = {
       default: {
-        en: "https://sefaria.nationbuilder.com/supportsefaria",
-        he: "https://sefaria.nationbuilder.com/supportsefaria_il"
+        en: "https://donate.sefaria.org/give/451346/#!/donation/checkout",
+        he: "https://donate.sefaria.org/give/468442/#!/donation/checkout"
       },
-      header: {
-        en: "https://sefaria.nationbuilder.com/supportsefaria_w",
-        he: "https://sefaria.nationbuilder.com/supportsefaria_il_w"
+      sustainer: {
+        en: "https://donate.sefaria.org/give/457760/#!/donation/checkout",
+        he: "https://donate.sefaria.org/give/478929/#!/donation/checkout"
       },
-      sponsor: {
-        en: "https://sefaria.nationbuilder.com/sponsor",
-        he: "https://sefaria.nationbuilder.com/sponsor",
+      dayOfLearning: {
+        en: "https://donate.sefaria.org/sponsor",
+        he: "https://donate.sefaria.org/sponsorhe",
       }
     };
-    url = Sefaria._v(linkOptions[link]);
+    const url = `${Sefaria._v(linkOptions[link])}?c_src=${source}`;
   }
-
-  const trackClick = () => {
-    Sefaria.track.event("Donations", "Donation Click", source);
-  };
-
   return (
     <a href={url} className={classes} target="_blank" onClick={trackClick}>
       {children}

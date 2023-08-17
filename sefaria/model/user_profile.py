@@ -12,10 +12,6 @@ from random import randint
 from sefaria.system.exceptions import InputError, SheetNotFoundError
 from functools import reduce
 
-from sefaria.utils.user import delete_user_account
-from sefaria.site.site_settings import SITE_SETTINGS
-
-
 if not hasattr(sys, '_doc_build'):
     from django.contrib.auth.models import User, Group, AnonymousUser
     from emailusernames.utils import get_user, user_exists
@@ -396,6 +392,13 @@ class UserProfile(object):
         self.nationbuilder_id = None
         self.gauth_email = None
 
+        # CRM
+        self.nationbuilder_id = None
+        self.sf_app_user_id = None
+
+        # new editor
+        self.show_editor_toggle = False
+        self.uses_new_editor = False
 
         # Fundraising
         self.is_sustainer = False

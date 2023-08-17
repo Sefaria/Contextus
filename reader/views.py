@@ -57,6 +57,7 @@ from sefaria.system.exceptions import InputError, PartialRefInputError, BookName
 from sefaria.system.cache import django_cache
 from sefaria.system.database import db
 from sefaria.helper.search import get_query_obj, get_es_server_url
+from sefaria.helper.crm.crm_mediator import CrmMediator
 from sefaria.search import get_search_categories
 from sefaria.helper.topic import get_topic, get_all_topics, get_topics_for_ref, get_topics_for_book, \
                                 get_bulk_topics, recommend_topics, get_top_topic, get_random_topic, \

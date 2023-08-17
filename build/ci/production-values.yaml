@@ -175,4 +175,5 @@ localSettings:
   DEFAULT_FROM_EMAIL: "Contextus <hello@contextus.org>"
   SERVER_EMAIL: "dev@contextus.org"
   MULTISERVER_ENABLED: "False"
-
+  CRM_TYPE: "SALESFORCE"
+  FAIL_GRACEFULLY: "True"
