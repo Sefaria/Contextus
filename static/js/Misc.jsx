@@ -1,28 +1,23 @@
 //const React      = require('react');
-import React, {useContext, useEffect, useRef, useState} from 'react';
-import ReactDOM from 'react-dom';
-import $ from './sefaria/sefariaJquery';
-import {CollectionsModal} from "./CollectionsWidget";
-import Sefaria from './sefaria/sefaria';
-import classNames from 'classnames';
-import PropTypes from 'prop-types';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import ReactDOM  from 'react-dom';
+import $  from './sefaria/sefariaJquery';
+import { CollectionsModal } from "./CollectionsWidget";
+import Sefaria  from './sefaria/sefaria';
+import classNames  from 'classnames';
+import PropTypes  from 'prop-types';
 import Component from 'react-class';
-import {usePaginatedDisplay} from './Hooks';
+import { usePaginatedDisplay } from './Hooks';
+import {ContentLanguageContext, AdContext} from './context';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import {ContentText} from "./ContentText";
+import {Editor} from "slate";
 import ReactTags from "react-tag-autocomplete";
 import {AdminEditorButton, useEditToggle} from "./AdminEditor";
 import {CategoryEditor, ReorderEditor} from "./CategoryEditor";
-import {refSort} from "./TopicPage";
 import {TopicEditor} from "./TopicEditor";
-import {generateContentForModal, SignUpModalKind} from './sefaria/signupModalContent';
-import {SourceEditor} from "./SourceEditor";
-import Cookies from "js-cookie";
-import {EditTextInfo} from "./BookPage";
-import ReactMarkdown from 'react-markdown';
-import TrackG4 from "./sefaria/trackG4";
-import {AdContext} from "./context";
+import { SignUpModalKind, generateContentForModal } from './sefaria/signupModalContent';
+
 /**
  * Component meant to simply denote a language specific string to go inside an InterfaceText element
  * ```
@@ -60,7 +55,7 @@ const __filterChildrenByLanguage = (children, language) => {
   return newChildren;
 };
 
-const InterfaceText = ({text, html, markdown, children, context}) => {
+const InterfaceText = ({text, html, children, context}) => {
   /**
    * Renders a single span for interface string with either class `int-en`` or `int-he` depending on Sefaria.interfaceLang.
    *  If passed explicit text or html objects as props with "en" and/or "he", will only use those to determine correct text or fallback text to display.
@@ -69,12 +64,11 @@ const InterfaceText = ({text, html, markdown, children, context}) => {
    * `children` can also take the form of <LangText> components above, so they can be used for longer paragrpahs or paragraphs containing html, if needed.
    * `context` is passed to Sefaria._ for additional translation context
    */
-  const contentVariable = html ?
-                          html : markdown ? markdown : text;  // assumption is `markdown` or `html` are preferred over `text` if they are present
+  const [contentVariable, isDangerouslySetInnerHTML]  = html ? [html, true] : [text, false];
   const isHebrew = Sefaria.interfaceLang === "hebrew";
   let elemclasses = classNames({"int-en": !isHebrew, "int-he": isHebrew});
   let textResponse = null;
-  if (contentVariable) {// Prioritize explicit props passed in for text of the element, does not attempt to use Sefaria._() for this case.
+  if (contentVariable) {// Prioritize explicit props passed in for text of the element, does not attempt to use Sefaria._() for this case
     let {he, en} = contentVariable;
     textResponse = isHebrew ? (he || en) : (en || he);
     let fallbackCls = (isHebrew && !he) ? " enInHe" : ((!isHebrew && !en) ? " heInEn" : "" );
@@ -91,10 +85,10 @@ const InterfaceText = ({text, html, markdown, children, context}) => {
     }
   }
   return (
-    html ?
+    isDangerouslySetInnerHTML ?
       <span className={elemclasses} dangerouslySetInnerHTML={{__html: textResponse}}/>
-        : markdown ? <span className={elemclasses}><ReactMarkdown className={'reactMarkdown'} unwrapDisallowed={true} disallowedElements={['p']}>{textResponse}</ReactMarkdown></span>
-                    : <span className={elemclasses}>{textResponse}</span>
+      :
+      <span className={elemclasses}>{textResponse}</span>
   );
 };
 InterfaceText.propTypes = {
@@ -109,6 +103,43 @@ InterfaceText.propTypes = {
   className: PropTypes.string
 };
 
+const ContentText = ({text, html, overrideLanguage, defaultToInterfaceOnBilingual=false, bilingualOrder = null}) => {
+  /**
+   * Renders content language throughout the site (content that comes from the database and is not interface language)
+   * Gets the active content language from Context and renders only the appropriate child(ren) for given language
+   * text {{text: object}} a dictionary {en: "some text", he: "some translated text"} to use for each language
+   * html {{html: object}} a dictionary {en: "some html", he: "some translated html"} to use for each language in the case where it needs to be dangerously set html
+   * overrideLanguage a string with the language name (full not 2 letter) to force to render to overriding what the content language context says. Can be useful if calling object determines one langugae is missing in a dynamic way
+   * defaultToInterfaceOnBilingual use if you want components not to render all languages in bilingual mode, and default them to what the interface language is
+   * bilingualOrder is an array of short language notations (e.g. ["he", "en"]) meant to tell the component what
+   * order to render the bilingual langauage elements in (as opposed to the unguaranteed order by default).
+   */
+  const [contentVariable, isDangerouslySetInnerHTML]  = html ? [html, true] : [text, false];
+  const contentLanguage = useContext(ContentLanguageContext);
+  const languageToFilter = (defaultToInterfaceOnBilingual && contentLanguage.language === "bilingual") ? Sefaria.interfaceLang : (overrideLanguage ? overrideLanguage : contentLanguage.language);
+  const langShort = languageToFilter.slice(0,2);
+  let renderedItems = Object.entries(contentVariable);
+  if(languageToFilter === "bilingual"){
+    if(bilingualOrder !== null){
+      //nifty function that sorts one array according to the order of a second array.
+      renderedItems.sort(function(a, b){
+        return bilingualOrder.indexOf(a[0]) - bilingualOrder.indexOf(b[0]);
+      });
+    }
+  }else{
+    renderedItems = renderedItems.filter(([lang, _])=>{
+      return lang === langShort;
+    });
+  }
+  return renderedItems.map( x =>
+      isDangerouslySetInnerHTML ?
+          <span className={`contentSpan ${x[0]}`} lang={x[0]} key={x[0]} dangerouslySetInnerHTML={{__html: x[1]}}/>
+          :
+          <span className={`contentSpan ${x[0]}`} lang={x[0]} key={x[0]}>{x[1]}</span>
+  );
+};
+
+
 const LoadingRing = () => (
   <div className="lds-ring"><div></div><div></div><div></div><div></div></div>
 );
@@ -121,21 +152,20 @@ const DonateLink = ({children, classes, source, link}) => {
     source = source || "undefined";
     const linkOptions = {
       default: {
-        en: "https://donate.sefaria.org/give/451346/#!/donation/checkout",
-        he: "https://donate.sefaria.org/give/468442/#!/donation/checkout"
+        en: "https://sefaria.nationbuilder.com/supportsefaria",
+        he: "https://sefaria.nationbuilder.com/supportsefaria_il"
       },
-      sustainer: {
-        en: "https://donate.sefaria.org/give/457760/#!/donation/checkout",
-        he: "https://donate.sefaria.org/give/478929/#!/donation/checkout"
+      header: {
+        en: "https://sefaria.nationbuilder.com/supportsefaria_w",
+        he: "https://sefaria.nationbuilder.com/supportsefaria_il_w"
       },
-      dayOfLearning: {
-        en: "https://donate.sefaria.org/sponsor",
-        he: "https://donate.sefaria.org/sponsorhe",
+      sponsor: {
+        en: "https://sefaria.nationbuilder.com/sponsor",
+        he: "https://sefaria.nationbuilder.com/sponsor",
       }
     };
-    const url = `${Sefaria._v(linkOptions[link])}?c_src=${source}`;
-  }  
-
+    url = `${Sefaria._v(linkOptions[link])}?c_src=${source}`;
+  }
   return (
     <a href={url} className={classes} target="_blank">
       {children}
@@ -1023,26 +1053,17 @@ class ToggleOption extends Component {
 
          //style={this.props.style}
 
-const requestWithCallBack = ({url, setSavingStatus, redirect, type="POST", data={}}) => {
-    let ajaxPayload = {url, type};
-    if (type === "POST") {
-      ajaxPayload.data = {json: JSON.stringify(data)};
-    }
-    $.ajax({
-      ...ajaxPayload,
-      success: function(result) {
-        if ("error" in result) {
-          if (setSavingStatus) {
-            setSavingStatus(false);
-          }
-          alert(result.error);
-        } else {
-          redirect();
-        }
-      }
-    }).fail(function() {
-      alert(Sefaria._("Something went wrong. Sorry!"));
-    });
+const postWithCallBack = ({url, data, setSavingStatus, redirect}) => {
+    $.post(url, {"json": JSON.stringify(data)}, function (result) {
+            if (result.error) {
+                setSavingStatus(false);
+                alert(result.error);
+            } else {
+                redirect();
+            }
+        }).fail(function (xhr, status, errorThrown) {
+            alert("Unfortunately, there may have been an error saving this topic information: " + errorThrown.toString());
+        });
 }
 
  const TopicToCategorySlug = function(topic, category=null) {
@@ -1071,196 +1092,74 @@ function useHiddenButtons() {
     return [hideButtons, handleMouseOverAdminButtons];
 }
 
-const AllAdminButtons = ({ buttonOptions, buttonsToDisplay, adminClasses }) => {
-  return (
-    <span className={adminClasses}>
-      {buttonsToDisplay.map((key, i) => {
-        const top = i === 0;
-        const bottom = i === buttonsToDisplay.length - 1;
-        const [buttonText, toggleAddingTopics] = buttonOptions[key];
-        return (
-          <AdminEditorButton 
-            text={buttonText} 
-            top={top} 
-            bottom={bottom}
-            toggleAddingTopics={toggleAddingTopics} 
-          />
-        );
-      })}
-    </span>
-  );
-};
-
-
-const CategoryHeader =  ({children, type, data = [], buttonsToDisplay = ["subcategory", "edit"]}) => {
-  /*
-  Provides an interface for using admin tools.
-  `type` is 'sources', 'cats', 'books' or 'topics'
-  `data` is list when `type` === 'cats' which tells us where we are in the TOC tree,
-        for `type` === 'books' it's the name of the book
-        for `type` === 'topics' it's a dictionary of the topic object
-        for `type` === 'sources' it's a list where the first item is topic slug and second item is source data
-  `buttonsToDisplay` is a list that says in the specified order we want all of the buttons in buttonOptions
-   */
+const CategoryHeader = ({children, type, path = [], editOnly = false}) => {
   const [editCategory, toggleEditCategory] = useEditToggle();
   const [addCategory, toggleAddCategory] = useEditToggle();
-  const [reorderCategory, toggleReorderCategory] = useEditToggle();
-  const [addSource, toggleAddSource] = useEditToggle();
-  const [addSection, toggleAddSection] = useEditToggle();
   const [hiddenButtons, setHiddenButtons] = useHiddenButtons(true);
-  const buttonOptions = {"subcategory": ["Add sub-category", toggleAddCategory],
-                          "source": ["Add a source", toggleAddSource],
-                          "section": ["Add section", toggleAddSection],
-                          "reorder": ["Reorder sources", toggleReorderCategory],
-                          "edit": ["Edit", toggleEditCategory]};     
 
-
-  let wrapper = "";
+  const adminClasses = classNames({adminButtons: 1, hiddenButtons});
   let adminButtonsSpan = null;
-  if (Sefaria.is_moderator) {
-    if (editCategory) {
-      adminButtonsSpan = <CategoryEditorWrapper toggle={toggleEditCategory} data={data} type={type}/>;
-    } else if (addSource) {
-      adminButtonsSpan = <SourceEditor topic={data.slug} close={toggleAddSource}/>;
-    } else if (addCategory) {
-      adminButtonsSpan = <CategoryAdderWrapper toggle={toggleAddCategory} data={data} type={type}/>;
-    } else if (addSection) {
-      window.location = `/add/${data}`;
-    } else if (reorderCategory) {
-      adminButtonsSpan = <ReorderEditorWrapper toggle={toggleReorderCategory} data={data} type={type}/>;  // reordering sources on a topic page
-    } else {
-      wrapper = "headerWithAdminButtons";
-      const adminClasses = classNames({adminButtons: 1, hiddenButtons});
-        adminButtonsSpan = <AllAdminButtons
-        buttonOptions={buttonOptions} 
-        buttonsToDisplay={buttonsToDisplay} 
-        adminClasses={adminClasses} 
-      />;
+  const [topicData, setTopicData] = useState(Sefaria.getTopicFromCache(path));
+
+  if (Sefaria.is_moderator && editCategory) {
+    if (path.length === 0) {  // at /texts or /topics
+      adminButtonsSpan = <ReorderEditor close={toggleEditCategory} type={type}/>;
+    } else if (type === "books") {
+      let tocObject = Sefaria.tocObjectByCategories(path);
+      const origDesc = {en: tocObject.enDesc, he: tocObject.heDesc};
+      const origCategoryDesc = {en: tocObject.enShortDesc, he: tocObject.heShortDesc};
+      const origData = {
+        origEn: tocObject.category,
+        origHe: tocObject.heCategory,
+        origDesc,
+        origCategoryDesc,
+        isPrimary: tocObject.isPrimary
+      };
+      adminButtonsSpan = <CategoryEditor origData={origData} close={toggleEditCategory} origPath={path.slice(0, -1)}/>;
+    } else if (type === "topics") {
+      if (!topicData) {
+        Sefaria.getTopic(path).then(d => {setTopicData(d);})
+      }
+      else {
+        const initCatSlug = TopicToCategorySlug(topicData);
+        const origData = {
+          origSlug: topicData.slug, origCategorySlug: initCatSlug,
+          origEn: topicData.primaryTitle.en, origHe: topicData.primaryTitle.he || ""
+        };
+        origData.origDesc = topicData.description || {"en": "", "he": ""};
+        origData.origCategoryDesc = topicData.categoryDescription || {"en": "", "he": ""};
+        const origWasCat = "displays-above" in topicData?.links;
+        adminButtonsSpan = <TopicEditor origData={origData}
+                                        origWasCat={origWasCat}
+                                        onCreateSuccess={(slug) => window.location.href = "/topics/" + slug}
+                                        close={toggleEditCategory}/>;
+      }
+
     }
+  } else if (Sefaria.is_moderator && addCategory) {
+    const origData = {origEn: ""};
+    if (type === "books") {
+      adminButtonsSpan = <CategoryEditor origData={origData} close={toggleAddCategory} origPath={path}/>;
+    } else if (type === "topics") {
+      origData['origCategorySlug'] = path;
+      adminButtonsSpan = <TopicEditor origData={origData} close={toggleAddCategory} origWasCat={false}
+                                      onCreateSuccess={(slug) => window.location.href = "/topics/" + slug}/>;
+    }
+  } else if (Sefaria.is_moderator) {
+    adminButtonsSpan = <span className={adminClasses}>
+                              {!editOnly ? <AdminEditorButton text="Add sub-category"
+                                                              toggleAddingTopics={toggleAddCategory}/> : null}
+      <AdminEditorButton text="Edit" toggleAddingTopics={toggleEditCategory}/>
+                          </span>;
+
   }
-  return <span className={wrapper}><span onMouseEnter={() => setHiddenButtons()}>{children}</span><span>{adminButtonsSpan}</span></span>;
-}
-const ReorderEditorWrapper = ({toggle, type, data}) => {
-    /*
-    Wrapper for ReorderEditor that can reorder topics, categories, and sources.  It is only used for reordering topics and categories at the
-    root of the topic or category TOC, so an empty array for `data` is passed indicating these cases.  In the case of reordering sources, `data`
-    is a dictionary of the topic whose sources can be accessed via its `refs` field.
-     */
-    const reorderingSources = data.length !== 0;
-    const _filterAndSortRefs = (refs) => {
-        if (!refs) {   
-            return [];
-        }
-        // a topic can be connected to refs in one language and not in another so filter out those that are not in current interface lang
-        refs = refs.filter((x) => !x.is_sheet && x?.order?.availableLangs?.includes(Sefaria.interfaceLang.slice(0, 2)));
-        // then sort the refs and take only first 30 sources because admins don't want to reorder hundreds of sources
-        return refs.sort((a, b) => refSort('relevance', [a.ref, a], [b.ref, b])).slice(0, 30);
-    }
-    const _createURLs = (type, data) => {
-      if (reorderingSources) {
-        return {
-          url: `/api/source/reorder?topic=${data.slug}&lang=${Sefaria.interfaceLang}`,
-          redirect: `/topics/${data.slug}`,
-          origItems: _filterAndSortRefs(data.refs?.about?.refs) || [],
-        }
-      }
-      switch (type) {  // at /texts or /topics
-        case 'topics':
-            return {
-              url: '/api/topic/reorder',
-              redirect: '/topics',
-              origItems: Sefaria.topic_toc
-            };
-        case 'cats':
-          return {
-            url: '/api/category?reorder=1',
-            redirect: '/texts',
-            origItems: Sefaria.toc
-          };
-      }
-    }
-    const {url, redirect, origItems} = _createURLs(type, data);
-    return <ReorderEditor
-            close={toggle}
-            type={!reorderingSources ? type : 'sources'}
-            origItems={origItems}
-            postURL={url}
-            redirect={redirect}
-          />;
+  const wrapper = addCategory || editCategory ? "" : "headerWithAdminButtons";
+  return <span className={wrapper}><span
+      onMouseEnter={() => setHiddenButtons()}>{children}</span>{adminButtonsSpan}</span>;
 }
 
-const EditorForExistingTopic = ({ toggle, data }) => {
-  const initCatSlug = TopicToCategorySlug(data);
-  const origData = {
-    origSlug: data.slug,
-    origCategorySlug: initCatSlug,
-    origEn: data.primaryTitle.en,
-    origHe: data.primaryTitle.he || "",
-    origDesc: data.description || {"en": "", "he": ""},
-    origCategoryDesc: data.categoryDescription || {"en": "", "he": ""},
-  };
-  
-  const origWasCat = "displays-above" in data?.links;
-  
-  return (
-    <TopicEditor 
-      origData={origData}
-      origWasCat={origWasCat}
-      onCreateSuccess={(slug) => window.location.href = `"/topics/"${slug}`}
-      close={toggle}
-    />
-  );
-};
 
 
-
-const EditorForExistingCategory = ({ toggle, data }) => {
-  let tocObject = Sefaria.tocObjectByCategories(data);
-  const origDesc = {en: tocObject.enDesc, he: tocObject.heDesc};
-  const origCategoryDesc = {en: tocObject.enShortDesc, he: tocObject.heShortDesc};
-  const origData = {
-    origEn: tocObject.category,
-    origHe: tocObject.heCategory,
-    origDesc,
-    origCategoryDesc,
-    isPrimary: tocObject.isPrimary
-  };
-
-  return (
-    <CategoryEditor 
-      origData={origData} 
-      close={toggle} 
-      origPath={data.slice(0, -1)}
-    />
-  );
-};
-
-
-const CategoryEditorWrapper = ({toggle, data, type}) => {
-  switch (type) {
-    case "books":
-      return <EditTextInfo initTitle={data} close={toggle}/>;
-    case "sources":
-        const [topicSlug, refData] = data;
-        return <SourceEditor topic={topicSlug} origData={refData} close={toggle}/>;
-    case "cats":
-        return <EditorForExistingCategory toggle={toggle} data={data} />;
-    case "topics":
-        return <EditorForExistingTopic toggle={toggle} data={data} />;
-  }
-}
-
-const CategoryAdderWrapper = ({toggle, data, type}) => {
-      const origData = {origEn: ""};
-      switch (type) {
-        case "cats":
-          return <CategoryEditor origData={origData} close={toggle} origPath={data}/>;
-        case "topics":
-          origData['origCategorySlug'] = data;
-          return <TopicEditor origData={origData} close={toggle} origWasCat={false}
-                                        onCreateSuccess={(slug) => window.location.href = "/topics/" + slug}/>;
-      }
-  }
 
 class SearchButton extends Component {
   render() {
@@ -1452,16 +1351,14 @@ SaveButton.propTypes = {
 };
 
 
-const ToolTipped = ({ altText, classes, style, onClick, children }) => {
-  const analyticsContext = useContext(AdContext)
-  return (
+const ToolTipped = ({ altText, classes, style, onClick, children }) => (
   <div aria-label={altText} tabIndex="0"
     className={classes} role="button"
-    style={style} onClick={e => TrackG4.gtagClick(e, onClick, `ToolTipped`, {"classes": classes}, analyticsContext)}
+    style={style} onClick={onClick}
     onKeyPress={e => {e.charCode == 13 ? onClick(e): null}}>
     { children }
   </div>
-)};
+);
 
 
 class FollowButton extends Component {
@@ -1845,14 +1742,59 @@ Note.propTypes = {
   isMyNote:        PropTypes.bool,
   editNote:        PropTypes.func
 };
+
+
+class MessageModal extends Component {
+  constructor(props) {
+    super(props);
+    this.textarea = React.createRef();
+    this.state = {
+      visible: false,
+      message: '',
+    };
+  }
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.visible && !prevState.visible) {
+      this.textarea.current.focus();
+    }
+  }
+  onChange(e) { this.setState({ message: e.target.value }); }
+  onSend(e) {
+    if (!this.state.message) { return; }
+    Sefaria.messageAPI(this.props.uid, this.state.message).then(() => {
+      this.setState({ visible: false });
+      alert("Message Sent");
+      Sefaria.track.event("Messages", "Message Sent", "");
+    });
+  }
+  makeVisible() { this.setState({ visible: true }); }
+  onCancel(e) { this.setState({ visible: false }); }
+  render() {
+    if (!this.state.visible) { return null; }
+    return (
+      <div id="interruptingMessageBox" className="sefariaModalBox sans-serif">
+        <div id="interruptingMessageOverlay" onClick={this.onCancel}></div>
+        <div id="interruptingMessage" className='message-modal' style={{display: 'block'}}>
+          <div className='messageHeader'>{ `${Sefaria._("Send a message to ")}${this.props.name}` }</div>
+          <textarea value={this.state.message} onChange={this.onChange} ref={this.textarea} />
+          <div className='sendMessage button' onClick={this.onSend}>{ Sefaria._("Send") }</div>
+          <div className='cancel button white' onClick={this.onCancel}>{ Sefaria._("Cancel") }</div>
+        </div>
+      </div>
+    );
+  }
+}
+MessageModal.propTypes = {
+  name: PropTypes.string.isRequired,
+  uid:  PropTypes.number.isRequired,
+};
+
+
 function NewsletterSignUpForm(props) {
   const {contextName, includeEducatorOption} = props;
-  const [email, setEmail] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [input, setInput] = useState('');
   const [educatorCheck, setEducatorCheck] = useState(false);
   const [subscribeMessage, setSubscribeMessage] = useState(null);
-  const [showNameInputs, setShowNameInputs] = useState(false);
 
   function handleSubscribeKeyUp(e) {
     if (e.keyCode === 13) {
@@ -1861,128 +1803,67 @@ function NewsletterSignUpForm(props) {
   }
 
   function handleSubscribe() {
-    if (showNameInputs === true) { // submit
-      if (firstName.length > 0 & lastName.length > 0) {
-        setSubscribeMessage("Subscribing...");
-        const request = new Request(
-        '/api/subscribe/'+email,
-        {headers: {'X-CSRFToken': Cookies.get('csrftoken')},
-        'Content-Type': 'application/json'}
-        );
-        fetch(request,
-            {
-              method: "POST",
-              mode: 'same-origin',
-              credentials: 'same-origin',
-              body: JSON.stringify({
-                language: Sefaria.interfaceLang === "hebrew" ? "he" : "en",
-                educator: educatorCheck,
-                firstName: firstName,
-                lastName: lastName
-              })
-            }
-        ).then(res => {
-          if ("error" in res) {
-            setSubscribeMessage(res.error);
-            setShowNameInputs(false);
-          } else {
+    const email = input;
+    if (Sefaria.util.isValidEmailAddress(email)) {
+      setSubscribeMessage("Subscribing...");
+      var list = Sefaria.interfaceLang == "hebrew" ? "Announcements_General_Hebrew" : "Announcements_General";
+      if (educatorCheck) {
+        list += "|" + (Sefaria.interfaceLang == "hebrew" ? "Announcements_Edu_Hebrew" : "Announcements_Edu");
+      }
+      $.post("/api/subscribe/" + email + "?lists=" + list, function(data) {
+        if ("error" in data) {
+          setSubscribeMessage(data.error);
+        } else {
           setSubscribeMessage("Subscribed! Welcome to our list.");
           Sefaria.track.event("Newsletter", "Subscribe from " + contextName, "");
         }
-        }).catch(data => {
-          setSubscribeMessage("Sorry, there was an error.");
-          setShowNameInputs(false);
-        });
-      } else {
-        setSubscribeMessage("Please enter a valid first and last name");// get he copy
-      }
-    } else if (Sefaria.util.isValidEmailAddress(email)) {
-      setShowNameInputs(true);
+      }).error(data => setSubscribeMessage("Sorry, there was an error."));
     } else {
-      setShowNameInputs(false);
       setSubscribeMessage("Please enter a valid email address.");
     }
   }
 
   return (
-      <div className="newsletterSignUpBox">
+    <div className="newsletterSignUpBox">
       <span className="int-en">
         <input
-            className="newsletterInput"
-            placeholder="Sign up for Newsletter"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
+          className="newsletterInput"
+          placeholder="Sign up for Newsletter"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyUp={handleSubscribeKeyUp} />
       </span>
-        <span className="int-he">
+      <span className="int-he">
         <input
-            className="newsletterInput"
-            placeholder="הרשמו לניוזלטר"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
+          className="newsletterInput"
+          placeholder="הרשמו לניוזלטר"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyUp={handleSubscribeKeyUp} />
       </span>
-        {!showNameInputs ? <img src="/static/img/circled-arrow-right.svg" onClick={handleSubscribe}/> : null}
-        {showNameInputs ?
-            <><span className="int-en">
-        <input
-            className="newsletterInput firstNameInput"
-            placeholder="First Name"
-            value={firstName}
-            autoFocus
-            onChange={e => setFirstName(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
-      </span>
-              <span className="int-he">
-        <input
-            className="newsletterInput firstNameInput"
-            placeholder="שם פרטי"
-            value={firstName}
-            onChange={e => setFirstName(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
-      </span>
-              <span className="int-en">
-        <input
-            className="newsletterInput"
-            placeholder="Last Name"
-            value={lastName}
-            onChange={e => setLastName(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
-      </span>
-              <span className="int-he">
-        <input
-            className="newsletterInput"
-            placeholder="שם משפחה"
-            value={lastName}
-            onChange={e => setLastName(e.target.value)}
-            onKeyUp={handleSubscribeKeyUp}/>
-      </span>
-              <div className="newsletterEducatorOption">
+      <img src="/static/img/circled-arrow-right.svg" onClick={handleSubscribe} />
+      {includeEducatorOption ?
+        <div className="newsletterEducatorOption">
           <span className="int-en">
             <input
-                type="checkbox"
-                className="educatorNewsletterInput"
-                checked={educatorCheck}
-                onChange={e => setEducatorCheck(!!e.target.checked)}/>
-            <span> I am an educator</span>
+              type="checkbox"
+              checked={educatorCheck}
+              onChange={e => setEducatorCheck(e.target.checked)} />
+            <span>I am an educator</span>
           </span>
-                <span className="int-he">
+          <span className="int-he">
             <input
-                type="checkbox"
-                className="educatorNewsletterInput"
-                checked={educatorCheck}
-                onChange={e => setEducatorCheck(!!e.target.checked)}/>
-            <span> מורים/ אנשי הוראה</span>
+              type="checkbox"
+              checked={educatorCheck}
+              onChange={e => setEducatorCheck(e.target.checked)} />
+            <span>מורים/ אנשי הוראה</span>
           </span>
-                <img src="/static/img/circled-arrow-right.svg" onClick={handleSubscribe}/>
-              </div>
-            </>
-            : null}
-        {subscribeMessage ?
-            <div className="subscribeMessage">{Sefaria._(subscribeMessage)}</div>
-            : null}
-      </div>
-  );
+        </div>
+      : null}
+      { subscribeMessage ?
+      <div className="subscribeMessage">{Sefaria._(subscribeMessage)}</div>
+      : null }
+    </div>);
 }
 
 
@@ -2009,6 +1890,7 @@ class LoginPrompt extends Component {
 LoginPrompt.propTypes = {
   fullPanel: PropTypes.bool,
 };
+
 
 class SignUpModal extends Component {
   render() {
@@ -2825,6 +2707,7 @@ const Autocompleter = ({getSuggestions, showSuggestionsOnSelect, inputPlaceholde
       setShowAddButton(results.showAddButton);
       setHelperPromptText(results.helperPromptText);
       if (!!results.previewText) {
+        setPreviewText(results.previewText);
         generatePreviewText(results.previewText);
       }
       if (!!results.helperPromptText) {
@@ -2879,8 +2762,7 @@ const Autocompleter = ({getSuggestions, showSuggestionsOnSelect, inputPlaceholde
 
   const handleSelection = () => {
     selectedCallback(inputValue, currentSuggestions);
-    setPreviewText(null);
-    setShowAddButton(false);
+    changeInputValue("");
   }
 
   const onKeyDown = e => {
@@ -2901,8 +2783,8 @@ const Autocompleter = ({getSuggestions, showSuggestionsOnSelect, inputPlaceholde
 
   const generatePreviewText = (ref) => {
         Sefaria.getText(ref, {context:1, stripItags: 1}).then(text => {
-           let segments = Sefaria.makeSegments(text, true);
-           segments = Sefaria.stripImagesFromSegments(segments);
+           const segments = Sefaria.makeSegments(text, true);
+           console.log(segments)
            const previewHTML =  segments.map((segment, i) => {
             {
               const heOnly = !segment.en;
@@ -2939,11 +2821,9 @@ const Autocompleter = ({getSuggestions, showSuggestionsOnSelect, inputPlaceholde
           onKeyDown={(e) => onKeyDown(e)}
           onClick={(e) => {e.stopPropagation()}}
           onChange={(e) => onChange(e.target.value)}
-          onBlur={(e) => setPreviewText(null) }
           value={inputValue}
           ref={inputEl}
           className={inputClassNames}
-
       /><span className="helperCompletionText sans-serif-in-hebrew">{helperPromptText}</span>
       {showAddButton ? <button className={buttonClassNames} onClick={(e) => {
                     handleSelection(inputValue, currentSuggestions)
@@ -2978,7 +2858,6 @@ const Autocompleter = ({getSuggestions, showSuggestionsOnSelect, inputPlaceholde
     </div>
     )
 }
-
 export {
   CategoryHeader,
   SimpleInterfaceBlock,
@@ -3002,6 +2881,7 @@ export {
   GlobalWarningMessage,
   InterruptingMessage,
   InterfaceText,
+  ContentText,
   EnglishText,
   HebrewText,
   CommunityPagePreviewControls,
@@ -3010,6 +2890,7 @@ export {
   LoadingMessage,
   LoadingRing,
   LoginPrompt,
+  MessageModal,
   NBox,
   NewsletterSignUpForm,
   Note,
@@ -3041,5 +2922,5 @@ export {
   AdminToolHeader,
   CategoryChooser,
   TitleVariants,
-  requestWithCallBack
+  postWithCallBack
 };

@@ -32,6 +32,7 @@ import {
 } from './Misc';
 import { Promotions } from './Promotions';
 import Component from 'react-class';
+import BeitMidrash, {BeitMidrashClosed} from './BeitMidrash';
 import  { io }  from 'socket.io-client';
 import { SignUpModalKind } from './sefaria/signupModalContent';
 
@@ -117,6 +118,9 @@ class ReaderApp extends Component {
       initialAnalyticsTracked: false,
       showSignUpModal: false,
       translationLanguagePreference: props.translationLanguagePreference,
+      beitMidrashStatus: Sefaria._uid && props.customBeitMidrashId ? true : false,
+      beitMidrashId: props.customBeitMidrashId ? props.customBeitMidrashId : "Sefaria",
+      inCustomBeitMidrash: !!props.customBeitMidrashId,
     };
   }
   makePanelState(state) {
@@ -167,6 +171,7 @@ class ReaderApp extends Component {
       textHighlights:          state.textHighlights          || null,
       profile:                 state.profile                 || null,
       tab:                     state.tab                     || null,
+      beitMidrashId:           state.beitMidrashId           || null,
       webPagesFilter:          state.webPagesFilter          || null,
       sideScrollPosition:      state.sideScrollPosition      || null,
       topicTestVersion:        state.topicTestVersion        || null
@@ -332,7 +337,7 @@ class ReaderApp extends Component {
 
       // After setting the dimensions, post the hit
       var url = window.location.pathname + window.location.search;
-      // Sefaria.track.pageview(url);
+      Sefaria.track.pageview(url);
 
       if (!this.state.initialAnalyticsTracked) {
         this.setState({initialAnalyticsTracked: true});
@@ -553,6 +558,11 @@ class ReaderApp extends Component {
             hist.title = Sefaria._("My Reading History");
             hist.url = "texts/history";
             hist.mode = "history";
+            break;
+          case "beit_midrash":
+            hist.title = Sefaria._("Sefaria Beit Midrash");
+            hist.url = "beit-midrash";
+            hist.mode = "beit-midrash";
         }
         hist.url = addTab(hist.url)
       } else if (state.mode === "Text") {
@@ -1849,11 +1859,6 @@ toggleSignUpModal(modalContentKind = SignUpModalKind.Default) {
 
   handleCopyEvent(e) {
     // Custom processing of Copy/Paste
-    const tagsToIgnore = ["INPUT", "TEXTAREA"];
-    if (tagsToIgnore.includes(e.srcElement.tagName)) {
-      // If the selection is from an input or textarea tag, don't do anything special
-      return
-    }
     const selection = document.getSelection()
     const closestReaderPanel = this.state.panels.length > 0 && e.target.closest('.readerPanel') || null
     let textOnly = selection.toString();
@@ -1878,12 +1883,6 @@ toggleSignUpModal(modalContentKind = SignUpModalKind.Default) {
       if (closestReaderPanel && closestReaderPanel.classList.contains('hebrew')) {
         container.setAttribute('dir', 'rtl');
       }
-
-      // Collapse all nodes with poetry classes. This is needed for specifically pasting into Google Docs in Chrome to work.
-      const poetryElsToCollapse = container.querySelectorAll('.poetry');
-      poetryElsToCollapse.forEach(poetryEl => {
-        poetryEl.outerHTML = poetryEl.innerHTML;
-      });
 
       // Remove extra breaks for continuous mode
       if (closestReaderPanel && closestReaderPanel.classList.contains('continuous')) {
@@ -2171,6 +2170,19 @@ toggleSignUpModal(modalContentKind = SignUpModalKind.Default) {
     const communityPagePreviewControls = this.props.communityPreview ?
       <CommunityPagePreviewControls date={this.props.communityPreview} /> : null;
 
+    const beitMidrashPanel = this.state.beitMidrashStatus ? (
+      <div id='beitMidrash' style={{width: 330,
+                                    marginInlineStart: "auto",
+                                    marginInlineEnd: 0,
+                                    height: `calc(100% - 60px)`,
+                                    marginTop: 60}}>
+          <BeitMidrash
+            socket={io(`//${Sefaria.rtc_server}`, {autoConnect: false})}
+            beitMidrashId = {this.state.beitMidrashId}
+            currentlyReading = {this.generateCurrentlyReading()}
+          />
+      </div>
+    ) : null
 
     var classDict = {readerApp: 1, multiPanel: this.props.multiPanel, singlePanel: !this.props.multiPanel};
     var interfaceLangClass = `interface-${this.props.interfaceLang}`;
@@ -2186,6 +2198,7 @@ toggleSignUpModal(modalContentKind = SignUpModalKind.Default) {
           {panels}
           {sefariaModal}
           {communityPagePreviewControls}
+          {beitMidrashPanel}
           <CookiesNotification />
         </div>
       </div>

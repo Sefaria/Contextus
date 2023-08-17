@@ -64,8 +64,7 @@ def update_empty(copy_into, copy_from):
         if v:
             if k not in copy_into or copy_into[k] == '' or copy_into[k] == []:
                 copy_into[k] = v
-    db.profiles.update_one({"id": copy_into["id"]}, {"$set": copy_into})
-
+    db.profile.save(copy_into)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

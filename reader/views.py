@@ -46,9 +46,9 @@ from sefaria.client.util import jsonResponse
 from sefaria.history import text_history, get_maximal_collapsed_activity, top_contributors, text_at_revision, record_version_deletion, record_index_deletion
 from sefaria.sheets import get_sheets_for_ref, get_sheet_for_panel, annotate_user_links, trending_topics
 from sefaria.utils.util import text_preview, short_to_long_lang_code, epoch_time
-from sefaria.utils.hebrew import hebrew_term, has_hebrew
+from sefaria.utils.hebrew import hebrew_term, is_hebrew
 from sefaria.utils.calendars import get_all_calendar_items, get_todays_calendar_items, get_keyed_calendar_items, get_parasha, get_todays_parasha
-from sefaria.settings import STATIC_URL, USE_VARNISH, USE_NODE, NODE_HOST, DOMAIN_LANGUAGES, MULTISERVER_ENABLED, SEARCH_ADMIN, MULTISERVER_REDIS_SERVER, \
+from sefaria.settings import STATIC_URL, USE_VARNISH, USE_NODE, NODE_HOST, DOMAIN_LANGUAGES, MULTISERVER_ENABLED, SEARCH_ADMIN, RTC_SERVER, MULTISERVER_REDIS_SERVER, \
     MULTISERVER_REDIS_PORT, MULTISERVER_REDIS_DB, DISABLE_AUTOCOMPLETER, ENABLE_LINKER
 from sefaria.site.site_settings import SITE_SETTINGS
 from sefaria.system.multiserver.coordinator import server_coordinator
@@ -57,12 +57,11 @@ from sefaria.system.exceptions import InputError, PartialRefInputError, BookName
 from sefaria.system.cache import django_cache
 from sefaria.system.database import db
 from sefaria.helper.search import get_query_obj, get_es_server_url
-from sefaria.helper.crm.crm_mediator import CrmMediator
 from sefaria.search import get_search_categories
 from sefaria.helper.topic import get_topic, get_all_topics, get_topics_for_ref, get_topics_for_book, \
                                 get_bulk_topics, recommend_topics, get_top_topic, get_random_topic, \
-                                get_random_topic_source, edit_topic_source, \
-                                update_order_of_topic_sources, delete_ref_topic_link
+                                get_random_topic_source, ref_topic_link_prep, annotate_topic_link, \
+                                get_node_in_library_topic_toc, get_path_for_topic_slug
 from sefaria.helper.community_page import get_community_page_items
 from sefaria.helper.file import get_resized_file
 from sefaria.image_generator import make_img_http_response
@@ -260,7 +259,8 @@ def base_props(request):
         },
         "trendingTopics": trending_topics(days=7, ntags=5),
         "_siteSettings": SITE_SETTINGS,
-        "_debug": DEBUG
+        "_debug": DEBUG,
+        "rtc_server": RTC_SERVER
     })
     return user_data
 
@@ -633,6 +633,7 @@ def text_panels(request, ref, version=None, lang=None, sheet=None):
         "initialNavigationCategories":    None,
         "initialNavigationTopicCategory": None,
         "initialNavigationTopicTitle":    None,
+        "customBeitMidrashId":            request.GET.get("beitMidrash", None)
     }
     if sheet == None:
         title = primary_ref.he_normal() if request.interfaceLang == "hebrew" else primary_ref.normal()
@@ -2611,7 +2612,7 @@ def terms_api(request, name):
 
 
 def get_name_completions(name, limit, ref_only, topic_override=False):
-    lang = "he" if has_hebrew(name) else "en"
+    lang = "he" if is_hebrew(name) else "en"
     completer = library.ref_auto_completer(lang) if ref_only else library.full_auto_completer(lang)
     object_data = None
     ref = None
@@ -2911,6 +2912,27 @@ def notifications_read_api(request):
 
 
 @catch_error_as_json
+def messages_api(request):
+    """
+    API for posting user to user messages
+    """
+    if not request.user.is_authenticated:
+        return jsonResponse({"error": "You must be logged in to access your messages."})
+
+    if request.method == "POST":
+        j = request.POST.get("json")
+        if not j:
+            return jsonResponse({"error": "No post JSON."})
+        j = json.loads(j)
+
+        Notification({"uid": j["recipient"]}).make_message(sender_id=request.user.id, message=j["message"]).save()
+        return jsonResponse({"status": "ok"})
+
+    elif request.method == "GET":
+        return jsonResponse({"error": "Unsupported HTTP method."})
+
+
+@catch_error_as_json
 def follow_api(request, action, uid):
     """
     API for following and unfollowing another user.
@@ -3117,13 +3139,12 @@ def topics_list_api(request):
 def add_new_topic_api(request):
     if request.method == "POST":
         data = json.loads(request.POST["json"])
-        isTopLevelDisplay = data["category"] == Topic.ROOT
-        t = Topic({'slug': "", "isTopLevelDisplay": isTopLevelDisplay, "data_source": "sefaria", "numSources": 0})
+        t = Topic({'slug': "", "isTopLevelDisplay": data["category"] == "Main Menu", "data_source": "sefaria", "numSources": 0})
         t.add_title(data["title"], 'en', True, True)
         if "heTitle" in data:
             t.add_title(data["heTitle"], "he", True, True)
 
-        if not isTopLevelDisplay:  # not Top Level so create an IntraTopicLink to category
+        if data["category"] != "Main Menu":  # not Top Level so create an IntraTopicLink to category
             new_link = IntraTopicLink({"toTopic": data["category"], "fromTopic": t.slug, "linkType": "displays-under", "dataSource": "sefaria"})
             new_link.save()
 
@@ -3223,41 +3244,38 @@ def reorder_topics(request):
         results.append(topic.contents())
     return jsonResponse({"topics": results})
 
+
 @catch_error_as_json
 def topic_ref_api(request, tref):
     """
-    API to get RefTopicLinks, as well as creating, editing, and deleting of RefTopicLinks
+    API to get RefTopicLinks
     """
-
-    data = request.GET if request.method in ["DELETE", "GET"] else json.loads(request.POST.get('json'))
-    slug = data.get('topic')
-    interface_lang = 'en' if data.get('interface_lang') == 'english' else 'he'
-    tref = Ref(tref).normal()  # normalize input
-    linkType = _CAT_REF_LINK_TYPE_FILTER_MAP['authors'][0] if AuthorTopic.init(slug) else 'about'
-    annotate = bool(int(data.get("annotate", False)))
-
     if request.method == "GET":
+        annotate = bool(int(request.GET.get("annotate", False)))
         response = get_topics_for_ref(tref, annotate)
         return jsonResponse(response, callback=request.GET.get("callback", None))
-    else:
+    elif request.method == "POST":
         if not request.user.is_staff:
-            return jsonResponse({"error": "Only moderators can connect edit topic sources."})
-        elif request.method == "DELETE":
-            return jsonResponse(delete_ref_topic_link(tref, slug, linkType, interface_lang))
-        elif request.method == "POST":
-            description = data.get("description", {})
-            creating_new_link = data.get("is_new", True)
-            new_tref = Ref(data.get("new_ref", tref)).normal()   # `new_tref` is only present when editing (`creating_new_link` is False)
-            ref_topic_dict = edit_topic_source(slug, orig_tref=tref, new_tref=new_tref, creating_new_link=creating_new_link,
-                                linkType=linkType, description=description, interface_lang=interface_lang)
-            return jsonResponse(ref_topic_dict)
+            return jsonResponse({"error": "Only moderators can connect refs to topics."})
 
-@staff_member_required
-def reorder_sources(request):
-    sources = json.loads(request.POST["json"]).get("sources", [])
-    slug = request.GET.get('topic')
-    lang = 'en' if request.GET.get('lang') == 'english' else 'he'
-    return jsonResponse(update_order_of_topic_sources(slug, sources, request.user.id, lang=lang))
+        slug = json.loads(request.POST.get("json")).get("topic", None)
+        topic_obj = Topic().load({"slug": slug})
+        if topic_obj is None:
+            return jsonResponse({"error": "Topic does not exist"})
+
+        ref_topic_link = {"toTopic": slug, "linkType": "about", "dataSource": "sefaria", "ref": tref}
+        if RefTopicLink().load(ref_topic_link) is None:
+            r = RefTopicLink(ref_topic_link)
+            r.save()
+            num_sources = getattr(topic_obj, "numSources", 0)
+            topic_obj.numSources = num_sources + 1
+            topic_obj.save()
+            ref_topic_dict = ref_topic_link_prep(r.contents())
+            ref_topic_dict = annotate_topic_link(ref_topic_dict, {slug: topic_obj})
+            return jsonResponse(ref_topic_dict)
+        else:
+            return {"error": "Topic link already exists"}
+
 
 _CAT_REF_LINK_TYPE_FILTER_MAP = {
     'authors': ['popular-writing-of'],
@@ -3457,6 +3475,40 @@ def leaderboard(request):
         'leaders1': top_contributors(1),
     })
 
+@catch_error_as_json
+def chat_message_api(request):
+    if request.method == "POST":
+        messageJSON = request.POST.get("json")
+        messageJSON = json.loads(messageJSON)
+
+        room_id = messageJSON["roomId"]
+        uids = room_id.split("-")
+        if str(request.user.id) not in uids:
+            return jsonResponse({"error": "Only members of a chatroom can post to it."})
+
+
+        message = Message({"room_id": room_id,
+                        "sender_id": messageJSON["senderId"],
+                        "timestamp": messageJSON["timestamp"],
+                        "message": messageJSON["messageContent"]})
+        message.save()
+        return jsonResponse({"status": "ok"})
+
+    if request.method == "GET":
+        room_id = request.GET.get("room_id")
+        uids = room_id.split("-")
+
+
+        if str(request.user.id) not in uids:
+            return jsonResponse({"error": "Only members of a chatroom can view it."})
+
+        skip = int(request.GET.get("skip", 0))
+        limit = int(request.GET.get("limit", 10))
+
+        messages = MessageSet({"room_id": room_id}, sort=[("timestamp", -1)], limit=limit, skip=skip).client_contents()
+        return jsonResponse(messages)
+
+    return jsonResponse({"error": "Unsupported HTTP method."})
 
 @ensure_csrf_cookie
 @sanitize_get_params
@@ -3539,14 +3591,6 @@ def account_user_update(request):
                 uuser.save()
             except Exception as e:
                 error = uuser.errors()
-
-            try:
-                crm_mediator = CrmMediator()
-                if not crm_mediator.update_user_email(accountUpdate["email"], uid=request.user.id):
-                    logger.warning("failed to add user to CRM")
-
-            except Exception as e:
-                logger.warning(f"failed to add user to salesforce: {e}")
 
         if not error:
             return jsonResponse({"status": "ok"})
@@ -4260,7 +4304,6 @@ def annual_report(request, report_year):
     pdfs = {
         '2020': STATIC_URL + 'files/Sefaria 2020 Annual Report.pdf',
         '2021': 'https://indd.adobe.com/embed/98a016a2-c4d1-4f06-97fa-ed8876de88cf?startpage=1&allowFullscreen=true',
-        '2022': STATIC_URL + 'files/Sefaria_AnnualImpactReport_R14.pdf',
     }
     if report_year not in pdfs:
         raise Http404
@@ -4591,3 +4634,16 @@ def rollout_health_api(request):
 
     return http.JsonResponse(resp, status=statusCode)
 
+@login_required
+def beit_midrash(request, slug):
+    chavrutaId = request.GET.get("cid", None)
+    starting_ref = request.GET.get("ref", None)
+
+    if starting_ref:
+        return redirect(f"/{urllib.parse.quote(starting_ref)}?beitMidrash={slug}")
+
+    else:
+        props = {"customBeitMidrashId": slug,}
+        title = _("Sefaria Beit Midrash")
+        desc  = _("The largest free library of Jewish texts available to read online in Hebrew and English including Torah, Tanakh, Talmud, Mishnah, Midrash, commentaries and more.")
+        return menu_page(request, props, "navigation", title, desc)

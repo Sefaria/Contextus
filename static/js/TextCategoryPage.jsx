@@ -5,6 +5,8 @@ import Sefaria  from './sefaria/sefaria';
 import { ContentLanguageContext } from './context';
 import { NavSidebar } from './NavSidebar';
 import Footer  from './Footer';
+import {useEditToggle, AdminEditorButton} from "./AdminEditor";
+import {CategoryEditor} from "./CategoryEditor";
 import ComparePanelHeader from './ComparePanelHeader';
 import {
   CategoryAttribution,
@@ -12,9 +14,9 @@ import {
   ResponsiveNBox,
   LanguageToggleButton,
   InterfaceText,
-  CategoryHeader
+  CategoryHeader,
+  ContentText
 } from './Misc';
-import {ContentText} from "./ContentText";
 
 
 // Navigation Menu for a single category of texts (e.g., "Tanakh", "Bavli")
@@ -58,7 +60,7 @@ const TextCategoryPage = ({category, categories, setCategories, toggleLanguage,
   const categoryToggle = (<SubCategoryToggle categories={cats} setCategories={setCategories} />);
   const title = compare ? categoryToggle :
     <div className="navTitle">
-        <CategoryHeader data={cats} type="cats">
+        <CategoryHeader path={cats} type="books">
             <h1>
             <ContentText text={{en: catTitle, he: heCatTitle}} defaultToInterfaceOnBilingual={true} />
             </h1>
@@ -175,7 +177,7 @@ const TextCategoryContents = ({category, contents, categories, setCategories, op
         shortDesc = hasDesc && !longDesc ? `(${shortDesc})` : shortDesc;
         content.push(
           <div className='category' key={"cat." + nestLevel + "." + item.category}>
-            <CategoryHeader data={newCats} type="cats">
+            <CategoryHeader path={newCats} type="books">
                  <h2>
                  <ContentText text={{en: item.category, he: item.heCategory}} defaultToInterfaceOnBilingual={true} />
                  {hasDesc && !longDesc ?

@@ -8,10 +8,8 @@ import {
     SimpleContentBlock,
     SimpleLinkedBlock,
     ProfileListing,
-    InterfaceText,
-    CategoryHeader,
+    ContentText, InterfaceText,
 } from './Misc';
-import {ContentText} from "./ContentText";
 
 // Much of Stories was removed November 2022.
 // It remains because some of the Components are re-used in other areas of the site.
@@ -106,7 +104,7 @@ const StoryTextListItem = ({text, toggleSignUpModal}) => (
     <div className="storyTextListItem">
         <ColorBarBox tref={text.ref} >
             <StoryBodyBlock>
-              <ContentText html={{en: text.en, he: text.he}} />
+                <ContentText html={{en: text.en, he: text.he}} />
             </StoryBodyBlock>
         </ColorBarBox>
         <SaveLine dref={text.ref} toggleSignUpModal={toggleSignUpModal}>
@@ -127,7 +125,7 @@ StorySheetList.propTypes = {
     toggleSignUpModal: PropTypes.func
 };
 
-const IntroducedTextPassage = ({text, topic, afterSave, toggleSignUpModal, bodyTextIsLink=false}) => {
+const IntroducedTextPassage = ({text, afterSave, toggleSignUpModal}) => {
     if (!text.ref) { return null; }
     const versions = text.versions || {}
     const params = Sefaria.util.getUrlVersionsParams(versions);
@@ -135,14 +133,10 @@ const IntroducedTextPassage = ({text, topic, afterSave, toggleSignUpModal, bodyT
     const heOnly = !text.en;
     const enOnly = !text.he;
     const overrideLanguage = (enOnly || heOnly) ? (heOnly ? "hebrew" : "english") : null;
-    let innerContent = <ContentText html={{en: text.en, he: text.he}} overrideLanguage={overrideLanguage} bilingualOrder={["he", "en"]} />;
-    const content = bodyTextIsLink ? <a href={url} style={{ textDecoration: 'none' }}>{innerContent}</a> : innerContent;
 
     return (
         <StoryFrame cls="introducedTextPassageStory">
-            <CategoryHeader type="sources" data={[topic, text]} buttonsToDisplay={["edit"]}>
-                <StoryTitleBlock en={text.descriptions?.en?.title} he={text.descriptions?.he?.title}/>
-            </CategoryHeader>
+            <StoryTitleBlock en={text.descriptions?.en?.title} he={text.descriptions?.he?.title} url={url}/>
             <div className={"systemText learningPrompt"}>
                 <InterfaceText text={{"en": text.descriptions?.en?.prompt, "he": text.descriptions?.he?.prompt}} />
             </div>
@@ -156,7 +150,7 @@ const IntroducedTextPassage = ({text, topic, afterSave, toggleSignUpModal, bodyT
             </SaveLine>
             <ColorBarBox tref={text.ref}>
                 <StoryBodyBlock>
-                    {content}
+                    <ContentText html={{en: text.en, he: text.he}} overrideLanguage={overrideLanguage} bilingualOrder={["he", "en"]} />
                 </StoryBodyBlock>
             </ColorBarBox>
         </StoryFrame>
@@ -169,7 +163,7 @@ IntroducedTextPassage.propTypes = {
     toggleSignUpModal:  PropTypes.func
 };
 
-const TextPassage = ({text, topic, afterSave, toggleSignUpModal, bodyTextIsLink=false}) => {
+const TextPassage = ({text, afterSave, toggleSignUpModal}) => {
   if (!text.ref) { return null; }
   const versions = text.versions || {}
   const params = Sefaria.util.getUrlVersionsParams(versions);
@@ -177,24 +171,20 @@ const TextPassage = ({text, topic, afterSave, toggleSignUpModal, bodyTextIsLink=
   const heOnly = !text.en;
   const enOnly = !text.he;
   const overrideLanguage = (enOnly || heOnly) ? (heOnly ? "hebrew" : "english") : null;
-  let innerContent = <ContentText html={{en: text.en, he: text.he}} overrideLanguage={overrideLanguage} bilingualOrder={["he", "en"]} />;
-  const content = bodyTextIsLink ? <a href={url} style={{ textDecoration: 'none' }}>{innerContent}</a> : innerContent;
 
   return (
     <StoryFrame cls="textPassageStory">
-      <CategoryHeader type="sources" data={[topic, text]} buttonsToDisplay={["edit"]}>
-          <SaveLine
-            dref={text.ref}
-            versions={versions}
-            toggleSignUpModal={toggleSignUpModal}
-            classes={"storyTitleWrapper"}
-            afterChildren={afterSave || null} >
-              <StoryTitleBlock en={text.ref} he={text.heRef} url={url}/>
-          </SaveLine>
-      </CategoryHeader>
+      <SaveLine 
+        dref={text.ref}
+        versions={versions}
+        toggleSignUpModal={toggleSignUpModal}
+        classes={"storyTitleWrapper"}
+        afterChildren={afterSave || null} >
+          <StoryTitleBlock en={text.ref} he={text.heRef} url={url}/>
+      </SaveLine>
       <ColorBarBox tref={text.ref}>
           <StoryBodyBlock>
-            {content}
+            <ContentText html={{en: text.en, he: text.he}} overrideLanguage={overrideLanguage} bilingualOrder={["he", "en"]} />
           </StoryBodyBlock>
       </ColorBarBox>
     </StoryFrame>

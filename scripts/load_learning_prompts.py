@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Import descriptions from a CSV
 Each record has fields "Topic Slug","Ref","Title for source", "Learning Prompt", and "Intro" 
@@ -9,6 +8,7 @@ Save the RefTopicLink
 (Initial draft from these instructions by GPT3)
 """
 
+# -*- coding: utf-8 -*-
 import os
 import csv
 import django
@@ -36,12 +36,11 @@ def import_descriptions(filename, lang):
     with open(filename, 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            topic_slug = row['Topic Slug'].strip()
+            topic_slug = row['Topic Slug']
             try:
                 ref = Ref(row['Ref']).normal()
             except:
-                if row['Ref']:
-                    print(f"Bad Ref: {row['Ref']}")
+                print(f"Skipping {row['Ref']}")
                 continue
             title = row['Title']
             prompt = row['Prompt']

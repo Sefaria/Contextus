@@ -23,6 +23,7 @@ import {
     ToolTipped,
     SimpleLinkedBlock,
     CategoryHeader,
+
 } from './Misc';
 
 /*
@@ -98,24 +99,21 @@ const refSort = (currSortOption, a, b) => {
     return a.order.comp_date - b.order.comp_date;
   }
   else {
-    const aAvailLangs = a.order.availableLangs;
-    const bAvailLangs = b.order.availableLangs;
+    const aAvailLangs = a.order.availableLangs || [];
+    const bAvailLangs = b.order.availableLangs || [];
     if ((Sefaria.interfaceLang === 'english') &&
-      (a.order.curatedPrimacy.en > 0 || b.order.curatedPrimacy.en > 0)) {
-      return b.order.curatedPrimacy.en - a.order.curatedPrimacy.en; }
+      (a?.order?.curatedPrimacy?.en || b?.order?.curatedPrimacy?.en)) {
+      return (b?.order?.curatedPrimacy?.en || 0) - (a?.order?.curatedPrimacy?.en || 0); }
     else if ((Sefaria.interfaceLang === 'hebrew') &&
-      (a.order.curatedPrimacy.he > 0 || b.order.curatedPrimacy.he > 0)) {
-      return b.order.curatedPrimacy.he - a.order.curatedPrimacy.he;
-    }
+      (a?.order?.curatedPrimacy?.he || b?.order?.curatedPrimacy?.he)) {
+      return (b?.order?.curatedPrimacy?.he || 0) - (a?.order?.curatedPrimacy?.he || 0); }
     if (Sefaria.interfaceLang === 'english' && aAvailLangs.length !== bAvailLangs.length) {
       if (aAvailLangs.indexOf('en') > -1) { return -1; }
       if (bAvailLangs.indexOf('en') > -1) { return 1; }
       return 0;
     }
     else if (a.order.custom_order !== b.order.custom_order) { return b.order.custom_order - a.order.custom_order; }  // custom_order, when present, should trump other data
-    else if (a.order.pr !== b.order.pr) {
-        return b.order.pr - a.order.pr;
-    }
+    else if (a.order.pr !== b.order.pr) { return b.order.pr - a.order.pr; }
     else { return (b.order.numDatasource * b.order.tfidf) - (a.order.numDatasource * a.order.tfidf); }
   }
 };
@@ -171,11 +169,9 @@ const refRenderWrapper = (toggleSignUpModal, topicData, topicTestVersion) => ite
   return (
     <Passage
       key={item[0]}
-      topic={topicData.slug}
       text={text}
       afterSave={afterSave}
       toggleSignUpModal={toggleSignUpModal}
-      bodyTextIsLink= {true}
     />
   );
 };
@@ -193,7 +189,7 @@ const sheetRenderWrapper = (toggleSignUpModal) => item => (
 
 
 
-const TopicCategory = ({topic, topicTitle, setTopic, setNavTopic, compare, initialWidth,
+const TopicCategory = ({topic, topicTitle, setTopic, setNavTopic, compare, initialWidth, 
   openDisplaySettings, openSearch}) => {
     const [topicData, setTopicData] = useState(Sefaria.getTopicFromCache(topic) || {primaryTitle: topicTitle});
     const [subtopics, setSubtopics] = useState(Sefaria.topicTocPage(topic));
@@ -222,14 +218,14 @@ const TopicCategory = ({topic, topicTitle, setTopic, setNavTopic, compare, initi
         return (
             <div className="navBlock">
               <a href={`/topics/${children ? 'category/' : ''}${slug}`}
-                 className="navBlockTitle"
+                 className="navBlockTitle" 
                  onClick={openTopic}
                  key={i}>
                 <InterfaceText text={{en, he}} />
               </a>
               {description ?
               <div className="navBlockDescription clamped">
-                <InterfaceText markdown={{en: description.en, he: description.he}} />
+                <InterfaceText text={{en: description.en, he: description.he}} />
               </div>
               : null }
             </div>
@@ -259,7 +255,7 @@ const TopicCategory = ({topic, topicTitle, setTopic, setNavTopic, compare, initi
                 <div className="sidebarLayout">
                   <div className="contentInner">
                       <div className="navTitle tight">
-                        <CategoryHeader type="topics" data={topicData}>
+                        <CategoryHeader type="topics" path={topic}>
                             <h1><InterfaceText text={{en: topicTitle.en, he: topicTitle.he}} /></h1>
                         </CategoryHeader>
                       </div>
@@ -293,12 +289,7 @@ const TopicSponsorship = ({topic_slug}) => {
         "parashat-achrei-mot": {
             "en": "Dedicated by Kevin Waldman in loving memory of his grandparents, Rose and Morris Waldman, who helped nurture his commitment to Jewish life.",
             "he": "מוקדש על-ידי קווין ולדמן לזכרם האהוב של סביו, רוז ומוריס ולדמן, שעזרו לטפח את מחויבותו לחיים יהודיים."
-        },
-        "parashat-vaetchanan": {
-            "en": "Shabbat Nachamu learning is dedicated in memory of Jerome L. Stern, Yehuda Leib ben David Shmuel, z\"l.",
-            "he": "הלימוד לשבת נחמו מוקדש לזכרו של ג'רום ל. שטרן, יהודה לייב בן דוד שמואל ז\"ל."
         }
-
     };
     const sponsorship_language = topic_sponsorship_map[topic_slug];
     if (!sponsorship_language) return null;
@@ -317,17 +308,18 @@ const TopicHeader = ({ topic, topicData, multiPanel, isCat, setNavTopic, openDis
   return (
     <div>
         <div className="navTitle tight">
-                <CategoryHeader type="topics" data={topicData} buttonsToDisplay={["source", "edit", "reorder"]}>
+            <CategoryHeader type="topics" path={topic} editOnly={true}>
                 <h1>
                     <InterfaceText text={{en:en, he:he}}/>
                 </h1>
-                </CategoryHeader>
+            </CategoryHeader>
         </div>
        {!topicData && !isCat ?<LoadingMessage/> : null}
        {!isCat && category ?
            <div className="topicCategory sectionTitleText">
              <a href={`/topics/category/${category.slug}`} onClick={e=>{ e.preventDefault(); setNavTopic(category.slug, category); }}>
-               <InterfaceText text={{en: category.en, he: category.he}}/>
+              <span className="int-en">{category.en}</span>
+              <span className="int-he">{category.he}</span>
              </a>
            </div>
        : null}
@@ -336,7 +328,8 @@ const TopicHeader = ({ topic, topicData, multiPanel, isCat, setNavTopic, openDis
        : null }
        {topicData && topicData.description ?
            <div className="topicDescription systemText">
-              <InterfaceText markdown={{en: topicData.description.en, he: topicData.description.he}}/>
+              <span className="int-en" dangerouslySetInnerHTML={ {__html: topicData.description.en} } />
+              <span className="int-he" dangerouslySetInnerHTML={ {__html: topicData.description.he} } />
             </div>
        : null}
        {topicData && topicData.ref ?
@@ -388,7 +381,7 @@ const useTabDisplayData = (translationLanguagePreference) => {
 };
 
 const TopicPage = ({
-  tab, topic, topicTitle, setTopic, setNavTopic, openTopics, multiPanel, showBaseText, navHome,
+  tab, topic, topicTitle, setTopic, setNavTopic, openTopics, multiPanel, showBaseText, navHome, 
   toggleSignUpModal, openDisplaySettings, setTab, openSearch, translationLanguagePreference, versionPref, topicTestVersion
 }) => {
     const defaultTopicData = {primaryTitle: topicTitle, tabs: {}, isLoading: true};
@@ -399,10 +392,10 @@ const TopicPage = ({
     const [showFilterHeader, setShowFilterHeader] = useState(false);
     const tabDisplayData = useTabDisplayData(translationLanguagePreference, versionPref);
 
-
     const scrollableElement = useRef();
-    const clearAndSetTopic = (topic, topicTitle) => {setTopic(topic, topicTitle)};
 
+    const clearAndSetTopic = (topic, topicTitle) => {setTopic(topic, topicTitle)};
+    
     // Initial Topic Data, updates when `topic` changes
     useEffect(() => {
       setTopicData(defaultTopicData); // Ensures topicTitle displays while loading
@@ -437,7 +430,7 @@ const TopicPage = ({
       useIncrementalLoad(
         tabObj.fetcher,
         refsToFetchByTab[key] || false,
-        Sefaria._topicPageSize,
+        70,
         data => setLoadedData(prev => {
           const updatedData = (!prev[key] || data === false) ? data : [...prev[key], ...data];
           if (topicData?.tabs?.[key]) { topicData.tabs[key].loadedData = updatedData; } // Persist loadedData in cache
@@ -462,7 +455,7 @@ const TopicPage = ({
         icon: `/static/icons/arrow-${showFilterHeader ? 'up' : 'down'}-bold.svg`,
         justifyright: true
       });
-      onClickFilterIndex = displayTabs.length - 1;
+      onClickFilterIndex = displayTabs.length - 1;      
     }
     const classStr = classNames({topicPanel: 1, readerNavMenu: 1});
     return <div className={classStr}>
@@ -513,7 +506,7 @@ const TopicPage = ({
                 </div>
                 <div className="sideColumn">
                     { topicData ?
-                    <TopicSideColumn
+                    <TopicSideColumn 
                       key={topic}
                       slug={topic}
                       links={topicData.links}
@@ -548,7 +541,7 @@ TopicPage.propTypes = {
 
 
 const TopicPageTab = ({
-  data, renderItem, classes, sortOptions, sortFunc, filterFunc, showFilterHeader,
+  data, renderItem, classes, sortOptions, sortFunc, filterFunc, showFilterHeader, 
   scrollableElement, onDisplayedDataChange, initialRenderSize
 }) => {
   return (
@@ -709,10 +702,10 @@ const ReadingsComponent = ({ parashaData, tref }) => (
     <div className="parasha">
         <div className="sectionTitleText"><InterfaceText text={{en:"Torah", he:"תורה"}} /></div>
         <div className="navSidebarLink ref serif">
-            <img src="/static/icons/book.svg" className="navSidebarIcon" alt="book icon" />
+            <img src="/static/icons/book.svg" className="navSidebarIcon" alt="book icon" />  
             <a href={'/' + tref.url} className="contentText"><InterfaceText text={{en:tref.en, he:norm_hebrew_ref(tref.he)}} /></a>
         </div>
-        <div className="aliyot">
+        <div className="aliyot"> 
         {
             parashaData.parasha?.extraDetails?.aliyot?.map((aliya, index) => {
                let sectionNum = index+1;
@@ -722,11 +715,11 @@ const ReadingsComponent = ({ parashaData, tref }) => (
                   <a className="sectionLink" href={"/" + Sefaria.normRef(aliya)} data-ref={aliya} key={aliya}>
                     <InterfaceText text={{en:sectionStr, he:heSectionStr}}/>
                   </a>
-                );
+                );    
             }) ?? null
-        }
+        }  
         </div>
-    </div>
+    </div>    
     <div className="haftarah">
         <div className="sectionTitleText"><InterfaceText text={{en:"Haftarah", he:"הפטרה"}}/></div>
         {parashaData.haftarah ?
@@ -734,7 +727,7 @@ const ReadingsComponent = ({ parashaData, tref }) => (
             {
               parashaData.haftarah.map(h => (
                 <div className="navSidebarLink ref serif">
-                    <img src="/static/icons/book.svg" className="navSidebarIcon" alt="book icon" />
+                    <img src="/static/icons/book.svg" className="navSidebarIcon" alt="book icon" />    
                     <a href={'/' + h.url} className="contentText" key={h.url}>
                       <InterfaceText text={{en:h.displayValue.en, he:norm_hebrew_ref(h.displayValue.he)}} />
                     </a>
@@ -776,7 +769,7 @@ const TopicMetaData = ({ timePeriod, properties={} }) => {
             url = propObj.url.he || propObj.url.en;
           } else {
             if (!propObj.url.en) { urlExists = false; }
-            url = propObj.url.en || propObj.url.he;
+            url = propObj.url.en || propObj.url.he;            
           }
           if (!url) { return null; }
           return (
@@ -800,6 +793,5 @@ const TopicMetaData = ({ timePeriod, properties={} }) => {
 
 export {
   TopicPage,
-  TopicCategory,
-  refSort
+  TopicCategory
 }

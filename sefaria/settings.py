@@ -124,7 +124,6 @@ MIDDLEWARE = [
     #'easy_timezones.middleware.EasyTimezoneMiddleware',
     #'django.middleware.cache.UpdateCacheMiddleware',
     #'django.middleware.cache.FetchFromCacheMiddleware',
-
 ]
 
 ROOT_URLCONF = 'sefaria.urls'
@@ -300,20 +299,22 @@ CACHES = {
 
 
 GLOBAL_INTERRUPTING_MESSAGE = {
-    "name": "2023-08-08-anniversary",
+    "name": "2023-3-8-modal-newsletter",
     "style":      "modal",  # "modal" or "banner"
-    "repetition": 1,
+    "repetition": 2,
     "is_fundraising": False,
     "condition":  {
         "returning_only": False,
         "english_only": False,
-        "desktop_only": False,
+        "desktop_only": True,
         "debug": False,
     }
 }
 
 
 # GLOBAL_INTERRUPTING_MESSAGE = None
+
+
 
 
 # Grab environment specific settings from a file which
@@ -325,7 +326,6 @@ try:
         from sefaria.local_settings import *
 except ImportError:
     from sefaria.local_settings_example import *
-
 
 # Listed after local settings are imported so CACHE can depend on DEBUG
 WEBPACK_LOADER = {

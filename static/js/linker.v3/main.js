@@ -325,15 +325,7 @@ import {LinkExcluder} from "./excluder";
     }
 
     function getFindRefsUrl() {
-        const params = {
-            with_text: 1,
-            debug: 0 + ns.debug,
-            max_segments: ns.maxParagraphs,
-        }
-        const queryString = Object.entries(params)
-            .map(([key, value]) => `${key}=${value}`)
-            .join('&')
-        return `${ns.sefariaUrl}/api/find-refs?${queryString}`;
+        return `${ns.sefariaUrl}/api/find-refs?with_text=1&debug=${0+ns.debug}&max_segments=${ns.maxParagraphs}`;
     }
 
     function getWebsiteApiUrl() {
@@ -353,7 +345,6 @@ import {LinkExcluder} from "./excluder";
                 description: getPageDescription(),
                 title: document.title,
             },
-            version_preferences_by_corpus: ns.versionPreferencesByCorpus,
             text: {
                 ...ns.normalizedInputText,
             },
@@ -417,7 +408,6 @@ import {LinkExcluder} from "./excluder";
             dynamic: false,
             hidePopupsOnMobile: true,
             debug: false,
-            versionPreferencesByCorpus: null,
 
             // Deprecated options
             selector: null,           // CSS Selector
@@ -437,7 +427,6 @@ import {LinkExcluder} from "./excluder";
         ns.excludeFromLinking = options.excludeFromLinking;
         ns.dynamic = options.dynamic;
         ns.debug = options.debug;
-        ns.versionPreferencesByCorpus = options.versionPreferencesByCorpus;
         ns.maxParagraphs = 20;
         // useful to remove sefaria links for now but I think when released we only want this to run in debug mode
         if (options.debug || true) { removeExistingSefariaLinks(); }

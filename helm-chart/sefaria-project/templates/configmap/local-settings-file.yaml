@@ -15,7 +15,6 @@ data:
         structlog = None
     import sefaria.system.logging as sefaria_logging
     import os
-    import sys
     import re
     import json
 
@@ -146,6 +145,8 @@ data:
     SEARCH_INDEX_NAME_SHEET = 'sheet'
     SEARCH_INDEX_NAME_MERGED = 'merged'
 
+    # DafRoulette server
+    RTC_SERVER = 'rtc.sefaria.org'
     TURN_SERVER = os.getenv("TURN_SERVER") #coturn.cauldron.sefaria.org
     TURN_SECRET= os.getenv("TURN_SECRET")
     TURN_USER = os.getenv("TURN_USER")
@@ -170,19 +171,11 @@ data:
 
     HOTJAR_ID = os.getenv("HOTJAR_ID")
 
-    # CRM settings
-    CRM_TYPE =  os.getenv("CRM_TYPE")
-
     NATIONBUILDER = True
     NATIONBUILDER_SLUG = "sefaria"
     NATIONBUILDER_TOKEN = os.getenv("NATIONBUILDER_TOKEN")
     NATIONBUILDER_CLIENT_ID = os.getenv("NATIONBUILDER_CLIENT_ID")
     NATIONBUILDER_CLIENT_SECRET = os.getenv("NATIONBUILDER_CLIENT_SECRET")
-
-    # Integration with Salesforce
-    SALESFORCE_BASE_URL = os.getenv("SALESFORCE_BASE_URL")
-    SALESFORCE_CLIENT_ID = os.getenv("SALESFORCE_CLIENT_ID")
-    SALESFORCE_CLIENT_SECRET = os.getenv("SALESFORCE_CLIENT_SECRET")
 
     DISABLE_INDEX_SAVE = False
 
@@ -254,18 +247,6 @@ data:
         }
     }
 
-    # Sentry
-    
-    SENTRY_DSN = os.getenv("SENTRY_DSN", None)
-    CLIENT_SENTRY_DSN = os.getenv("CLIENT_SENTRY_DSN", None)
-    SENTRY_CODE_VERSION = os.getenv("SENTRY_CODE_VERSION", "unknown")
-    SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "unknown")
-
-    if SENTRY_DSN:
-        from sefaria.settings_utils import init_sentry
-        
-        init_sentry(SENTRY_DSN, SENTRY_CODE_VERSION, SENTRY_ENVIRONMENT)
-
     # TODO: Make the logging format more configurable based on specific objects being defined.
     # LOGGING = {
     #     'version': 1,
@@ -329,9 +310,3 @@ data:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-
-    # Fail gracefully when decorator conditional_graceful_exception on function. This should be set to True on production
-    # Example: If a text or ref cannot be properly loaded, fail gracefully and let the server continue to run
-    FAIL_GRACEFULLY = os.getenv("FAIL_GRACEFULLY").lower() == "true"
-    if "pytest" in sys.modules:
-        FAIL_GRACEFULLY = False
