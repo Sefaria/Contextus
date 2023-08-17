@@ -151,10 +151,9 @@ secrets:
   slackWebhook:
     ref: slack-webhook-production
 instrumentation:
-  enabled: true
+  enabled: false
   otelEndpoint: "http://otel-collector-collector.monitoring:4317"
   jaegerEndpoint: "jaeger-agent-dev.monitoring.svc.cluster.local:6831"
-
 localSettings:
   DEBUG: false
   DOMAIN_LANGUAGE: {
