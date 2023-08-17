@@ -9,6 +9,8 @@ import Track from './track';
 import Hebrew from './hebrew';
 import Util from './util';
 import $ from './sefariaJquery';
+import {useContext} from "react";
+import {ContentLanguageContext} from "../context";
 
 
 let Sefaria = Sefaria || {
@@ -1002,6 +1004,15 @@ Sefaria = extend(Sefaria, {
             }, error);
     });
   },
+  isFullSegmentImage: function(text) {
+    /**
+     * Is `text` a segment with only an image
+     * To distinguish from inline images
+     * Returns `true` if yes.
+     */
+    const pattern = /^\s*<img\b[^>]*>\s*$/i;
+    return pattern.test(text);
+  },
   getRefFromCache: function(ref) {
     if (!ref) return null;
     const versionedKey = this._refmap[this._refKey(ref)] || this._refmap[this._refKey(ref, {context:1})];
@@ -1036,6 +1047,7 @@ Sefaria = extend(Sefaria, {
       return ref ? this.getRefFromCache(ref) : null;
   },
   _lookups: {},
+
   // getName w/ refOnly true should work as a replacement for parseRef - it uses a callback rather than return value.  Besides that - same data.
   getName: function(name, refOnly = false, limit = undefined) {
     const trimmed_name = name.trim();
@@ -1068,6 +1080,13 @@ Sefaria = extend(Sefaria, {
       });
   },
   _topicCompletions: {},
+  getTopicCompletions: function (word, callback) {
+       return this._cachedApiPromise({
+          url: `${Sefaria.apiHost}/api/topic/completion/${word}`, key: word,
+          store: Sefaria._topicCompletions,
+          processor: callback
+      });   // this API is used instead of api/name because when we want all topics. api/name only gets topics with a minimum amount of sources
+  },
   _lexiconLookups: {},
   getLexiconWords: function(words, ref) {
     // Returns Promise which resolve to a list of lexicon entries for the given words
@@ -1920,7 +1939,7 @@ _media: {},
     // Used when isACaseVariant() is true to prepare the alternative
     return data["completions"][0] + query.slice(data["completions"][0].length);
   },
-  makeSegments: function(data, withContext) {
+  makeSegments: function(data, withContext, sheets=false) {
     // Returns a flat list of annotated segment objects,
     // derived from the walking the text in data
     if (!data || "error" in data) { return []; }
@@ -1986,6 +2005,14 @@ _media: {},
       }
     }
     return segments;
+  },
+  stripImagesFromSegments: function(segments) {
+      // Used by sheets editors.  Sefaria.makeSegments creates a list of segments and this function handles the images.
+      return segments.map(x => {
+          x.he = Sefaria.util.stripImgs(x.he);
+          x.en = Sefaria.util.stripImgs(x.en);
+          return x;
+      })
   },
   sectionString: function(ref) {
     // Returns a pair of nice strings (en, he) of the sections indicated in ref. e.g.,
@@ -2315,6 +2342,7 @@ _media: {},
     });
   },
   _topics: {},
+  _topicPageSize: 70, // how many sources should show when incrementally loading sources
   _CAT_REF_LINK_TYPE_FILTER_MAP: {
     'authors': ['popular-writing-of'],
   },
@@ -2363,6 +2391,12 @@ _media: {},
           };
         }
         const ref = refObj.is_sheet ? parseInt(refObj.ref.replace('Sheet ', '')) : refObj.ref;
+        if (refObj.order) {
+            refObj.order = {...refObj.order, availableLangs: refObj?.order?.availableLangs || [],
+                                numDatasource: refObj?.order?.numDatasource || 1,
+                                tfidf: refObj?.order?.tfidf || 0,
+                                pr: refObj?.order?.pr || 0,
+                                curatedPrimacy: {he: refObj?.order?.curatedPrimacy?.he || 0, en: refObj?.order?.curatedPrimacy?.en || 0}}}
         tabs[tabKey].refMap[refObj.ref] = {ref, order: refObj.order, dataSources: refObj.dataSources, descriptions: refObj.descriptions};
       }
     }
@@ -2945,8 +2979,7 @@ Sefaria.unpackBaseProps = function(props){
       "followRecommendations",
       "trendingTopics",
       "_siteSettings",
-      "_debug",
-      "rtc_server"
+      "_debug"
   ];
   for (const element of dataPassedAsProps) {
       if (element in props) {

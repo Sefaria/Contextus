@@ -1,6 +1,6 @@
 {{- if .Values.cronJobs.trello.enabled }}
 ---
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ .Values.deployEnv }}-trello
@@ -62,7 +62,7 @@ spec:
             ]
             resources:
               limits:
-                memory: "500Mi"
+                memory: "1.5Gi"
           restartPolicy: Never
           volumes:
           - name: local-settings

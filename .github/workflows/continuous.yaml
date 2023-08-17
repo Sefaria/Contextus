@@ -7,6 +7,10 @@ on:
     branches:
       - "*"
 
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   duplication-check:
     runs-on: ubuntu-latest
@@ -15,11 +19,14 @@ jobs:
     steps:
       - name: Check if push is in PR
         id: check
-        uses: 8BitJonny/gh-get-current-pr@1.4.0
+        uses: 8BitJonny/gh-get-current-pr@2.2.0
         with:
           filterOutClosed: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
   build-generic:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     runs-on: ubuntu-latest
     needs: duplication-check
     if: ${{ github.event_name == 'pull_request' || ( github.event_name == 'push' && needs.duplication-check.outputs.inPR == 'false' ) }}
@@ -32,19 +39,36 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ secrets.DEV_GKE_PROJECT_ID}}/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: '${{ secrets.DEV_GKE_SA }}'
       - name: Login to GCR
         uses: docker/login-action@v1
         with:
           registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.DEV_CLOUDBUILD_SA_KEY }}
+          username: oauth2accesstoken
+          password: '${{ steps.auth.outputs.access_token }}'
+      - name: Login to GAR
+        uses: docker/login-action@v1
+        with:
+          registry: us-east1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: '${{ steps.auth.outputs.access_token }}'
       - name: Get branch name
         id: branch-raw
         uses: tj-actions/branch-names@v5.1
       - name: Format branch name
         id: branch-name
-        run: |
-          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }} | awk '{print tolower($0)}' | sed 's/[^a-z0-9\.\-]//g') >> $GITHUB_OUTPUT
+        run: >-
+          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }}
+          | awk '{print tolower($0)}'
+          | sed 's|.*/\([^/]*\)/.*|\1|; t; s|.*|\0|'
+          | sed 's/[^a-z0-9\.\-]//g')
+          >> $GITHUB_OUTPUT
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
@@ -54,6 +78,7 @@ jobs:
         with:
           images: |
             gcr.io/${{ secrets.DEV_PROJECT }}/sefaria-${{ matrix.app }}-${{ steps.branch-name.outputs.current_branch }}
+            us-east1-docker.pkg.dev/${{ secrets.DEV_PROJECT }}/containers/sefaria-${{ matrix.app }}-${{ steps.branch-name.outputs.current_branch }}
           # generate Docker tags based on the following events/attributes
           tags: |
             type=ref,event=branch
@@ -73,7 +98,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
   build-derived:
     runs-on: ubuntu-latest
-    needs: 
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    needs:
       - duplication-check
       - build-generic
     strategy:
@@ -86,19 +114,36 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ secrets.DEV_GKE_PROJECT_ID}}/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: '${{ secrets.DEV_GKE_SA }}'
       - name: Login to GCR
         uses: docker/login-action@v1
         with:
           registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.DEV_CLOUDBUILD_SA_KEY }}
+          username: oauth2accesstoken
+          password: '${{ steps.auth.outputs.access_token }}'
+      - name: Login to GAR
+        uses: docker/login-action@v1
+        with:
+          registry: us-east1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: '${{ steps.auth.outputs.access_token }}'
       - name: Get branch name
         id: branch-raw
         uses: tj-actions/branch-names@v5.1
       - name: Format branch name
         id: branch-name
-        run: |
-          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }} | awk '{print tolower($0)}' | sed 's/[^a-z0-9\.\-]//g') >> $GITHUB_OUTPUT
+        run: >-
+          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }}
+          | awk '{print tolower($0)}'
+          | sed 's|.*/\([^/]*\)/.*|\1|; t; s|.*|\0|'
+          | sed 's/[^a-z0-9\.\-]//g')
+          >> $GITHUB_OUTPUT
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
@@ -108,6 +153,7 @@ jobs:
         with:
           images: |
             gcr.io/${{ secrets.DEV_PROJECT }}/sefaria-${{ matrix.app }}-${{ steps.branch-name.outputs.current_branch }}
+            us-east1-docker.pkg.dev/${{ secrets.DEV_PROJECT }}/containers/sefaria-${{ matrix.app }}-${{ steps.branch-name.outputs.current_branch }}
           # generate Docker tags based on the following events/attributes
           tags: |
             type=ref,event=branch
@@ -126,7 +172,7 @@ jobs:
           context: .
           push: true
           build-args: |
-            SRC_IMG=gcr.io/${{ secrets.DEV_PROJECT }}/sefaria-web-${{ steps.branch-name.outputs.current_branch }}:sha-${{ steps.get-sha.outputs.sha_short }}
+            SRC_IMG=us-east1-docker.pkg.dev/${{ secrets.DEV_PROJECT }}/containers/sefaria-web-${{ steps.branch-name.outputs.current_branch }}:sha-${{ steps.get-sha.outputs.sha_short }}
           file: ./build/${{ matrix.app }}/Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -155,13 +201,19 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     needs: build-derived
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-      - name: Authenticate GHA Runner to GCP
-        uses: 'google-github-actions/auth@v1'
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.DEV_CLOUDBUILD_SA_KEY }}
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ secrets.DEV_GKE_PROJECT_ID}}/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: '${{ secrets.DEV_GKE_SA }}'
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v0
         with:
@@ -172,8 +224,12 @@ jobs:
         uses: tj-actions/branch-names@v5.1
       - name: Format branch name
         id: branch-name
-        run: |
-          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }} | awk '{print tolower($0)}' | sed 's/[^a-z0-9\.\-]//g') >> $GITHUB_OUTPUT
+        run: >-
+          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }}
+          | awk '{print tolower($0)}'
+          | sed 's|.*/\([^/]*\)/.*|\1|; t; s|.*|\0|'
+          | sed 's/[^a-z0-9\.\-]//g')
+          >> $GITHUB_OUTPUT
       - name: Set outputs
         id: get-sha
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -204,7 +260,7 @@ jobs:
       - name: Set outputs
         id: get-sha
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Wait for test sandbox to become available 
+      - name: Wait for test sandbox to become available
         # https://gist.github.com/rgl/f90ff293d56dbb0a1e0f7e7e89a81f42
         run: ./build/ci/waitForSandbox.bash
         env:
@@ -215,14 +271,20 @@ jobs:
     name: "PyTest"  # This name is referenced when slacking status
     needs:
       - sandbox-ready
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Authenticate GHA Runner to GCP
-        uses: 'google-github-actions/auth@v1'
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.DEV_CLOUDBUILD_SA_KEY }}
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ secrets.DEV_GKE_PROJECT_ID}}/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: '${{ secrets.DEV_GKE_SA }}'
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v0
         with:
@@ -242,19 +304,23 @@ jobs:
         uses: tj-actions/branch-names@v5.1
       - name: Format branch name
         id: branch-name
-        run: |
-          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }} | awk '{print tolower($0)}' | sed 's/[^a-z0-9\.\-]//g') >> $GITHUB_OUTPUT
+        run: >-
+          echo "current_branch="$(echo ${{ steps.branch-raw.outputs.current_branch }}
+          | awk '{print tolower($0)}'
+          | sed 's|.*/\([^/]*\)/.*|\1|; t; s|.*|\0|'
+          | sed 's/[^a-z0-9\.\-]//g')
+          >> $GITHUB_OUTPUT
       - name: Start Job
         run: envsubst '${GITHUB_RUN_ID},${DEPLOY_ENV},${WEB_IMAGE_NAME},${WEB_IMAGE_TAG},${TIMESTAMP}' < ./build/ci/pyTestPod.yaml | kubectl apply -f -
         env:
           # dependent on GITHUB_RUN_ID, which is implicitly passed in
           DEPLOY_ENV: sandbox-${{ steps.get-sha.outputs.sha_short }}
-          WEB_IMAGE_NAME: gcr.io/${{secrets.DEV_PROJECT}}/sefaria-web-${{ steps.branch-name.outputs.current_branch }}
+          WEB_IMAGE_NAME: us-east1-docker.pkg.dev/${{secrets.DEV_PROJECT}}/containers/sefaria-web-${{ steps.branch-name.outputs.current_branch }}
           WEB_IMAGE_TAG: sha-${{ steps.get-sha.outputs.sha_short }}
       - name: Wait For Job To Finish
         run: ./build/ci/waitForCIJob.bash
         timeout-minutes: 60
-        env: 
+        env:
           # dependent on GITHUB_RUN_ID, which is implicitly passed in
           TEST_NAME: pytest
       - name: Get Logs From Cluster and propogate test result
@@ -284,16 +350,22 @@ jobs:
   sandbox-cleanup:
     name: "Clean up CI Sandbox"
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: 
+    needs:
       - pytest-job
     runs-on: ubuntu-latest
-    steps: 
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Authenticate GHA Runner to GCP
-        uses: 'google-github-actions/auth@v1'
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.DEV_CLOUDBUILD_SA_KEY }}
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/${{ secrets.DEV_GKE_PROJECT_ID}}/locations/global/workloadIdentityPools/github/providers/github'
+          service_account: '${{ secrets.DEV_GKE_SA }}'
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v0
         with:
@@ -314,6 +386,6 @@ jobs:
         env:
           NAMESPACE: ${{ secrets.DEV_SANDBOX_NAMESPACE }}
           NAME: sandbox-${{ steps.get-sha.outputs.sha_short }}
-      - name: Uninstall 
-        run: helm delete sandbox-${{ steps.get-sha.outputs.sha_short }} -n ${{ secrets.DEV_SANDBOX_NAMESPACE }} --debug --timeout 10m0s 
+      - name: Uninstall
+        run: helm delete sandbox-${{ steps.get-sha.outputs.sha_short }} -n ${{ secrets.DEV_SANDBOX_NAMESPACE }} --debug --timeout 10m0s
         if: steps.get-helm.outputs.count > 0

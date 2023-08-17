@@ -1,9 +1,10 @@
 # An example of settings needed in a local_settings.py file.
 # copy this file to sefaria/local_settings.py and provide local info to run.
 from datetime import timedelta
+import sys
 import structlog
 import sefaria.system.logging as sefaria_logging
-
+import os
 
 # These are things you need to change!
 
@@ -175,20 +176,24 @@ SEFARIA_DATA_PATH = '/path/to/your/Sefaria-Data' # used for Data
 SEFARIA_EXPORT_PATH = '/path/to/your/Sefaria-Data/export' # used for exporting texts
 
 
-# DafRoulette server
-RTC_SERVER = '' # Root URL/IP of the server
-
 GOOGLE_GTAG = 'your gtag id here'
 GOOGLE_TAG_MANAGER_CODE = 'you tag manager code here'
 
 HOTJAR_ID = None
 
+# Determine which CRM connection implementations to use
+CRM_TYPE = "NONE"  # "SALESFORCE" || "NATIONBUILDER" || "NONE"
+
 # Integration with a NationBuilder list
-NATIONBUILDER = False
 NATIONBUILDER_SLUG = ""
 NATIONBUILDER_TOKEN = ""
 NATIONBUILDER_CLIENT_ID = ""
 NATIONBUILDER_CLIENT_SECRET = ""
+
+# Integration with Salesforce
+SALESFORCE_BASE_URL = ""
+SALESFORCE_CLIENT_ID = ""
+SALESFORCE_CLIENT_SECRET = ""
 
 # Issue bans to Varnish on update.
 USE_VARNISH = False
@@ -305,3 +310,12 @@ structlog.configure(
     wrapper_class=structlog.stdlib.BoundLogger,
     cache_logger_on_first_use=True,
 )
+
+SENTRY_DSN = None
+CLIENT_SENTRY_DSN = None
+
+# Fail gracefully when decorator conditional_graceful_exception on function. This should be set to True on production
+# Example: If a text or ref cannot be properly loaded, fail gracefully and let the server continue to run
+FAIL_GRACEFULLY = False
+if "pytest" in sys.modules:
+    FAIL_GRACEFULLY = False
