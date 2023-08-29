@@ -1,0 +1,11 @@
+diff --git a/build/ci/production-values.yaml b/build/ci/production-values.yaml
+index 7231bbbcf..d2e32a0e2 100644
+--- a/build/ci/production-values.yaml
++++ b/build/ci/production-values.yaml
+@@ -175,4 +175,5 @@ localSettings:
+   DEFAULT_FROM_EMAIL: "Contextus <hello@contextus.org>"
+   SERVER_EMAIL: "dev@contextus.org"
+   MULTISERVER_ENABLED: "False"
+-
++  CRM_TYPE: "SALESFORCE"
++  FAIL_GRACEFULLY: "True"
