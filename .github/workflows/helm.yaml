@@ -51,6 +51,14 @@ jobs:
         id: semantic
         with:
           working_directory: ./helm-chart
+          semantic_version: 19.0.5
+          extra_plugins: |
+            conventional-changelog-conventionalcommits@6.1.0
+            @semantic-release/commit-analyzer@9.0.2
+            @semantic-release/release-notes-generator@10.0.3
+            @semantic-release/npm@9.0.2
+            @semantic-release/github@8.0.7
+            @semantic-release/git@10.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup

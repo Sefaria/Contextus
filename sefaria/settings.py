@@ -298,21 +298,22 @@ CACHES = {
 
 
 
-GLOBAL_INTERRUPTING_MESSAGE = {
-    "name": "2023-3-8-modal-newsletter",
-    "style":      "modal",  # "modal" or "banner"
-    "repetition": 1,
-    "is_fundraising": False,
-    "condition":  {
-        "returning_only": False,
-        "english_only": False,
-        "desktop_only": True,
-        "debug": False,
-    }
-}
+# GLOBAL_INTERRUPTING_MESSAGE = {
+#     "name": "2023-3-8-modal-newsletter",
+#     "name": "2023-08-20-torah-campaign",
+#     "style":      "modal",  # "modal" or "banner"
+#     "repetition": 1,
+#     "is_fundraising": False,
+#     "condition":  {
+#         "returning_only": False,
+#         "english_only": False,
+#         "desktop_only": True,
+#         "debug": False,
+#     }
+# }
 
 
-# GLOBAL_INTERRUPTING_MESSAGE = None
+GLOBAL_INTERRUPTING_MESSAGE = None
 
 
 

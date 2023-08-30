@@ -2,6 +2,7 @@ sandbox: "false"
 contentSandbox: "false"
 deployEnv: production
 previousServicesCount: "3"
+deploymentMessage: true
 restore:
   enabled: true
   bucket: sefaria-contextus-backup
@@ -52,6 +53,7 @@ redis:
   containerImage:
     imageRegistry: redis
     tag: latest
+  pdb: true
   resources:
     requests:
       memory: "500Mi"
@@ -120,6 +122,7 @@ nginx:
     imageRegistry:
     tag:
   SEARCH_HOST: contextus-es-http.elasticsearch.svc
+  disableScraping: false
   replicaCount: 2
   resources:
     requests:
