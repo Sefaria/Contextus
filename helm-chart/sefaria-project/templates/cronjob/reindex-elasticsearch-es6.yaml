@@ -33,7 +33,7 @@ spec:
                 memory: 7Gi
             env:
             - name: SEARCH_HOST
-              value: "{{ .Values.cronjobs.reindexElasticSearch.SEARCH_HOST_ES6 }}"
+              value: "{{ .Values.cronJobs.reindexElasticSearch.SEARCH_HOST_ES6 }}"
             - name: REDIS_HOST
               value: "redis-{{ .Values.deployEnv }}"
             - name: NODEJS_HOST
@@ -62,7 +62,7 @@ spec:
             command: ["bash"]
             args: [
               "-c",
-              "mkdir -p /log && touch /log/sefaria_book_errors.log && pip install numpy && /app/run /app/scripts/reindex_elasticsearch_cronjob_ES6.py"
+              "mkdir -p /log && touch /log/sefaria_book_errors.log && pip install numpy && /app/run /app/scripts/scheduled/reindex_elasticsearch_cronjob_ES6.py"
             ]
           restartPolicy: Never
           volumes:
