@@ -17,5 +17,6 @@ SITE_SETTINGS = {
 	"LIBRARY_MESSAGE": "The largest free library of Jewish texts available to read online in Hebrew and English including Torah, Tanakh, Talmud, Mishnah, Midrash, commentaries and more.",
 	"COLLECTIONS_BUCKET": "sefaria-collection-images",
 	"PROFILES_BUCKET": 'sefaria-profile-pictures',
-	"UGC_BUCKET": 'sheet-user-uploaded-media'
+	"UGC_BUCKET": 'sheet-user-uploaded-media',
+	"TOPICS_BUCKET": 'img.sefaria.org'
 }

@@ -22,7 +22,9 @@ import {
   EducatorsPage,
   RabbisPage,
   DonatePage,
-  WordByWordPage
+  WordByWordPage,
+  JobsPage,
+  TeamMembersPage,
 } from './StaticPages';
 import {
   SignUpModal,
@@ -1321,14 +1323,15 @@ class ReaderApp extends Component {
       Sefaria.track.event("Reader", "Choose Version", `${oRef.indexTitle} / default version / ${panel.settings.language}`)
     }
     panel.settings.language = this._getPanelLangOnVersionChange(panel, versionLanguage, panel.mode === "Connections");
-    if((this.state.panels.length > n+1) && this.state.panels[n+1].mode === "Connections"){
-      const connectionsPanel =  this.state.panels[n+1];
-      connectionsPanel.currVersions = panel.currVersions;
-      connectionsPanel.settings.language = this._getPanelLangOnVersionChange(connectionsPanel, versionLanguage, true);
-    } else if (n-1 >= 0 && this.state.panels[n].mode === "Connections") {
-      const masterPanel = this.state.panels[n-1];
-      masterPanel.currVersions = panel.currVersions;
-      masterPanel.settings.language = this._getPanelLangOnVersionChange(masterPanel, versionLanguage);
+    const { dependentPanel, isDependentPanelConnections } = this._getDependentPanel(n);
+
+    // make sure object reference changes for setState()
+    panel.currVersions = {...panel.currVersions};
+    if (this.props.multiPanel) { //there is no dependentPanel in mobile
+      dependentPanel.currVersions = {...panel.currVersions};
+
+      dependentPanel.settings.language = this._getPanelLangOnVersionChange(dependentPanel, versionLanguage, isDependentPanelConnections);
+
     }
     this.setState({panels: this.state.panels});
   }
@@ -1916,6 +1919,11 @@ class ReaderApp extends Component {
       let elsToStrip = container.querySelectorAll(linksToStrip);
       elsToStrip.forEach(el => el.outerHTML = el.innerText);
 
+
+      // Collapse all spans that are not rangeSpan. This is also needed for specifically pasting into Google Docs in Chrome to work.
+      let SourceTextSpans = container.querySelectorAll('span:not(.rangeSpan)');
+      SourceTextSpans.forEach(el => el.outerHTML = el.innerText);
+
       html = container.outerHTML;
       textOnly = Sefaria.util.htmlToText(html);
       selectedEls = container;
@@ -2248,5 +2256,7 @@ export {
   EducatorsPage,
   RabbisPage,
   DonatePage,
-  WordByWordPage
+  WordByWordPage,
+  JobsPage,
+  TeamMembersPage,
 };
