@@ -123,7 +123,7 @@ nginx:
   containerImage:
     imageRegistry:
     tag:
-  SEARCH_HOST: elasticsearch-8-http.elasticsearch.svc
+  SEARCH_HOST: elasticsearch-8-es-http.elasticsearch.svc
   disableScraping: false
   replicaCount: 2
   resources:
