@@ -66,7 +66,7 @@ babel
 python-bidi
 requests
 Cerberus
-opentelemetry-distro
-opentelemetry-exporter-otlp
-opentelemetry-propagator-b3
-opentelemetry-propagator-jaeger
+#opentelemetry-distro
+#opentelemetry-exporter-otlp
+#opentelemetry-propagator-b3
+#opentelemetry-propagator-jaeger

@@ -123,7 +123,7 @@ nginx:
   containerImage:
     imageRegistry:
     tag:
-  SEARCH_HOST: contextus-es-http.elasticsearch.svc
+  SEARCH_HOST: elasticsearch-8-es-http.elasticsearch.svc
   disableScraping: false
   replicaCount: 2
   resources:
@@ -150,8 +150,15 @@ cronJobs:
     enabled: false
   reindexElasticSearch:
     enabled: true
-    SEARCH_HOST_ES6: "contextus-es-default-0.elasticsearch.svc"
-    SEARCH_HOST_ES8: "elasticsearch-8-es-default-0.elasticsearch.svc"
+    SEARCH_HOST_ES8: "elasticsearch-8-es-default.elasticsearch.svc"
+  topicsIndexing:
+    enabled: true
+  trello:
+    enabled: true
+  trends:
+    enabled: true
+  weeklyEmailNotifications:
+     enabled: true
 secrets:
   localSettings:
     ref: local-settings-secrets-production
@@ -163,6 +170,7 @@ instrumentation:
   enabled: false
   otelEndpoint: "http://otel-collector-collector.monitoring:4317"
   jaegerEndpoint: "jaeger-agent-dev.monitoring.svc.cluster.local:6831"
+
 localSettings:
   DEBUG: false
   DOMAIN_LANGUAGE: {
@@ -170,7 +178,6 @@ localSettings:
   }
   MONGO_HOST: "mongo"
   APSCHEDULER_NAME: "apscheduler-{{ .Values.deployEnv }}"
-  SEARCH_ADMIN: "http://contextus-es-http.elasticsearch.svc:9200"
   TURN_SERVER: ''
   USE_CLOUDFLARE: false
   FRONT_END_URL:  "http://contextus.org"
@@ -180,7 +187,6 @@ localSettings:
   GLOBAL_WARNING: false
   GLOBAL_WARNING_MESSAGE: "Contextus will be in <b>Read-Only</b> mode for scheduled maintenance from 4:45pm-6:45pm Pacific time. Edits will <b>not</b> be saved during that time."
   SITE_PACKAGE: "sites.s4d"
-  SEARCH_HOST: contextus-es-http.elasticsearch.svc
   DEFAULT_FROM_EMAIL: "Contextus <hello@contextus.org>"
   SERVER_EMAIL: "dev@contextus.org"
   MULTISERVER_ENABLED: "False"

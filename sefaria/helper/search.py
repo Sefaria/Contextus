@@ -140,22 +140,15 @@ def get_filter_obj(type, filters, filter_fields):
 def make_filter(type, agg_type, agg_key):
     if type == "text":
         # filters with '/' might be leading to books. also, very unlikely they'll match an false positives
-        reg = re.escape(agg_key) + (".*" if "/" in agg_key else "/.*")
+        agg_key = agg_key.rstrip('/')
+        agg_key = re.escape(agg_key)
+        reg = f"{agg_key}|{agg_key}/.*"
         return Regexp(path=reg)
     elif type == "sheet":
         return Term(**{agg_type: agg_key})
 
 
-def get_es_server_url(admin=False):
-    from sefaria.settings import SEARCH_ADMIN, SEARCH_ADMIN_PW, SEARCH_ADMIN_USER
-    base_url = SEARCH_ADMIN  # if admin else SEARCH_NON_ADMIN  #  should have option for SEARCH_NON_ADMIN but need to add to local settings
-    if SEARCH_ADMIN_USER:
-        match = re.search(r'^(https?://)(.*)$', base_url)
-        if match:
-            http, base_url = match.group(1), match.group(2)
-        else:
-            http, base_url = "http://", base_url
-        es_url = f"{http}{SEARCH_ADMIN_USER}:{SEARCH_ADMIN_PW}@{base_url}"
-    else:
-        es_url = base_url
-    return es_url
+def get_elasticsearch_client():
+    from elasticsearch import Elasticsearch
+    from sefaria.settings import SEARCH_URL
+    return Elasticsearch(SEARCH_URL)
