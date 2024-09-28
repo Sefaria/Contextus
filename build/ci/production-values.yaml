@@ -38,11 +38,11 @@ web:
       gunicornThreadCount: 5
       resources:
         requests:
-          memory: "12Gi"
-          cpu: "1500m"
+          memory: "3Gi"
+          cpu: "1"
         limits:
-          memory: "14Gi"
-          cpu: "2"
+          memory: "4Gi"
+          cpu: "1"
   secrets:
     googleClient:
       ref: google-client-secret
@@ -67,7 +67,7 @@ nodejs:
   containerImage:
     imageRegistry:
     tag:
-  replicaCount: 2
+  replicaCount: 1
   resources:
     requests:
       memory: "1Gi"
@@ -80,17 +80,17 @@ varnish:
   replicaCount: 1
   resources:
     requests:
-      memory: "17Gi"
-      cpu: "1"
+      memory: "1Gi"
+      cpu: "500"
     limits:
-      memory: "18Gi"
-      cpu: "1500m"
+      memory: "2Gi"
+      cpu: "500m"
   tuning:
-    malloc: "14440m"
+    malloc: "500m"
     nuke_limit: "400"
     thread_pools: 2
-    thread_pool_max: 5000
-    thread_pool_min: 100
+    thread_pool_max: 500
+    thread_pool_min: 10
     first_byte_timeout: 60  # Default 60s
     between_bytes_timeout: 60  # Default 60s
   secrets:
@@ -125,7 +125,7 @@ nginx:
     tag:
   SEARCH_HOST: elasticsearch-8-es-http.elasticsearch.svc
   disableScraping: false
-  replicaCount: 2
+  replicaCount: 1
   resources:
     requests:
       memory: "200Mi"
